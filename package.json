@@ -1,6 +1,6 @@
 {
   "name": "lcxl3-bitwig",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Profile-based Novation Launch Control XL 3 controller for Bitwig Studio",
   "scripts": {"test": "node tests/run.cjs", "check": "node tools/check-syntax.cjs"},

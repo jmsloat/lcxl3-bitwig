@@ -1,45 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
 const assert = require('assert/strict');
-const callbacks = {}, writes = [], midi = [], sysex = [], presetMessages = [];
-const observer = {setObservedParameterIds: ids => { callbacks.observed = ids; }};
-function valueStub(initial) {
-    let current=initial, listener;
-    return {addValueObserver: fn => { listener=fn; fn(current); }, set: v => {current=v; if(listener)listener(v);}};
-}
-const remoteState=Array.from({length:8},()=>({name:valueStub(''),exists:valueStub(false),value:valueStub(NaN),display:valueStub('')}));
-const remotePage={
-    getName:()=>valueStub('Remote Controls'), selectedPageIndex:()=>valueStub(0), pageCount:()=>valueStub(0),
-    getParameter:i=>({name:()=>remoteState[i].name,exists:()=>remoteState[i].exists,value:()=>Object.assign(remoteState[i].value,{displayedValue:()=>remoteState[i].display,inc:v=>writes.push(['remote',i,v])})}),
-    selectNextPage:()=>{},selectPreviousPage:()=>{}
-};
-const existsValue=valueStub(true), pinnedValue=valueStub(false);
-const device = {
-    exists:()=>existsValue, isPinned:()=>pinnedValue, createCursorRemoteControlsPage:()=>remotePage,
-    name: () => ({addValueObserver: fn => callbacks.name = fn}),
-    addDirectParameterIdObserver: fn => callbacks.ids = fn,
-    addDirectParameterNormalizedValueObserver: fn => callbacks.value = fn,
-    addDirectParameterValueDisplayObserver: (n, fn) => { callbacks.display = fn; return observer; },
-    setDirectParameterValueNormalized: (...args) => writes.push(['set', ...args]),
-    incDirectParameterValueNormalized: (...args) => writes.push(['inc', ...args])
-};
-const output = {sendMidi: (...args) => midi.push(args), sendSysex: data => sysex.push(data)};
-const context = {loadAPI: () => {}, CursorDeviceFollowMode: {FOLLOW_SELECTION: 0}, host: {
-    scheduleTask: () => {}, sendDatagramPacket: () => {},
-    defineController: () => {}, defineMidiPorts: () => {}, addDeviceNameBasedDiscoveryPair: () => {},
-    getMidiOutPort: () => output, getMidiInPort: () => ({setMidiCallback: fn => callbacks.midi = fn, createNoteInput: () => ({setShouldConsumeEvents: () => {}, sendRawMidiEvent: (...args) => presetMessages.push(args)})}),
-    createCursorTrack: () => ({createCursorDevice: () => device})
-}};
-vm.createContext(context);
-context.load = file => vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),context);
-vm.runInContext(fs.readFileSync(path.join(__dirname,'..','LCXL3 Device Profiles.control.js'),'utf8'),context);
-context.init();
+const {createHarness}=require('./harness.cjs');
+const h=createHarness(), {context,callbacks,writes,midi,sysex,presetMessages}=h;
 assert.equal(writes.length,0, 'init never changes plugin parameters');
 const params = context.IROKO_PARAMETERS;
 function select(name) {
-    callbacks.name(name);
-    callbacks.ids(Object.values(params));
+    h.selectDevice(name, params);
     for (const id of Object.values(params)) callbacks.value(id,0.5);
     callbacks.value(params['Amp Sel'],0);
     context.flush();

@@ -34,6 +34,10 @@ avoiding two scripts with the same identity.
 
 - **Select a device header in Bitwig's device chain** to follow it. A floating
   plugin window does not necessarily change Bitwig's selection.
+- **Track left/right:** previous/next plugin instance with a registered custom
+  profile, across the project. Unsupported devices are skipped and navigation
+  wraps. Each instance is a separate stop, including duplicates on one track.
+  If locked, the lock moves with the destination.
 - **Page up/down:** change the active profile's pages, or Bitwig's Remote Controls
   pages in generic mode.
 - **Shift + encoder:** fine adjustment.
@@ -50,6 +54,29 @@ Knob LEDs show parameter positions with a 3%-60% RGB intensity range and a
 power-1.5 curve. Button LEDs use 15% when off and 100% when on. Settings are in
 [`lib/settings.js`](lib/settings.js); effect hues belong to the device profile.
 Faders use pickup to avoid jumps after device changes or external edits.
+
+Track navigation follows Bitwig's flattened track order, then main-chain device
+order. Group tracks, children of collapsed groups, return tracks and master are
+included; devices nested inside racks/layers are excluded. Bypassed plugins still
+qualify when their name and parameter signature match. Generic Remote Controls
+alone do not qualify. With no match, the display shows **No supported plugins**;
+with one instance, navigation stays there. From an unsupported device it chooses
+the nearest match in the requested direction, wrapping at the ends.
+
+Discovery uses metadata-only paged banks (one track and eight devices per window),
+scanning all pages without a project-size limit. Rapid presses queue in order;
+large projects take longer to scan. The script revalidates the destination using
+an independent pinned cursor, selects its track and exact device, and confirms
+the controller cursor before restoring the lock. Manual selection changes cancel
+pending discovery. A removed or moved destination cancels the handoff.
+
+Parameter writes and preset commands pause during handoff. Pickup, button state
+and cached feedback reset even between identical plugin instances. The permanent
+display shows the track name, profile and page number, device position (`D1`,
+`D2`, …), and page name. Page memory remains per profile. Navigation never sets
+monitoring, record arm, or the host device's bypass state; Bitwig's selection
+preferences still apply. Iroko's existing internal always-on section rules resume
+after the handoff.
 
 ## Iroko profile
 
@@ -113,6 +140,7 @@ the entry point; the shared engine does not need plugin-specific edits.
 
 - `lib/controller.js`: selection, profile lifecycle, bindings, pickup and feedback
 - `lib/hardware.js`: LCXL3 DAW MIDI/SysEx and cached RGB output
+- `lib/navigation.js`: paged instance discovery, identity validation and handoff
 - `lib/generic.js`: Bitwig Remote Controls fallback
 - `lib/profile-registry.js`: registration, validation and matching
 - `profiles/iroko.js`: Iroko behavior and layout
@@ -130,7 +158,11 @@ npm test
 The suite checks Iroko's established behavior, wrapped parameter-ID feedback,
 RGB brightness, button overlays, preset-message edges, fader pickup, independent
 profile switching, signature matching, generic remotes/page bounds, cursor lock,
-and isolation of profile-specific writes. Bitwig globals are mocked in tests;
+and isolation of profile-specific writes. Navigation checks cover duplicate
+instances, mixed profiles, generic origins, both directions, wrapping, one/no
+matches, queued/held buttons, locked origins, main-chain scope, identity changes,
+manual cancellation, pickup/write suspension and projects larger than bank windows.
+Bitwig globals are mocked in tests;
 hardware and live API checks are separate.
 
 Runtime diagnostics are off by default. Set `diagnostics: true` in
