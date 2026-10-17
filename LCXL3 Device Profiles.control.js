@@ -5,6 +5,8 @@ load("lib/hardware.js");
 load("lib/generic.js");
 load("profiles/iroko-parameters.js");
 load("profiles/iroko.js");
+load("profiles/pigments-parameters.js");
+load("profiles/pigments.js");
 load("lib/navigation.js");
 load("lib/controller.js");
 

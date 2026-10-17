@@ -24,6 +24,12 @@ Call `registerLCXL3Profile({...})` from a file loaded by the entry point:
 - `id`, `name`: stable internal ID and short screen title.
 - `matchNames`: exact, case-insensitive device names; avoid broad substrings.
 - `parameters`: `{ 'Readable Name': 'Bitwig parameter ID' }`.
+- `valueDisplay`: optional `"plugin"` to use only host-formatted labels (Hz, dB,
+  seconds, enum labels, etc.). This mode holds the last label while awaiting a
+  replacement and leaves the value blank before its first label. Numeric updates
+  still drive parameter writes, LEDs and pickup without inserting percentages.
+  `"normalized"` consistently shows 0–100% positions. By default the engine uses
+  current host-formatted values with a percentage fallback.
 - `requiredParameters`: signature names that must exist before activating.
 - `pages`: named pages, each with exactly three arrays of eight binding names.
 - `faders`: exactly eight names. Use an empty string for an unassigned slot.

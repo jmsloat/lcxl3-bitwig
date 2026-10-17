@@ -37,3 +37,20 @@ track-type matrix were covered in the harness, not reproduced in the live projec
 Physical screen readability and MIDI from the hardware Track buttons still need
 normal hands-on use; live commands were injected through the controller's MIDI
 handler. Runtime diagnostics are disabled in the final installation.
+
+## Cached navigation and Pigments follow-up
+
+Navigation now retains the discovered plugin catalog. Tests check that repeat
+switches visit only the destination track window without another project scan,
+track-count changes invalidate the cache, missing destinations rebuild it,
+Shift + Track refreshes newly added plugins, and manual selection among identical
+profiles uses the correct origin. Delayed cursor-equality callbacks are covered
+with a 250 ms acknowledgment delay. Track LEDs, immediate discovery overlays and
+plugin/track destination feedback are also tested.
+
+Live diagnostics reproduced a handoff cancellation on the real Pigments instance:
+its name/IDs changed before cursor equality reported the destination. Waiting for
+the equality acknowledgment completed the handoff successfully. A controlled
+round trip between Iroko and Pigments then showed one discovery scan and one
+cache hit, with both handoffs complete. Temporary probes and diagnostics were
+removed afterward. Physical screen/LED confirmation still requires hands-on use.

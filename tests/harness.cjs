@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-function createHarness({pinDelay=0,clampBanks=false}={}) {
-    const callbacks={}, writes=[], midi=[], sysex=[], presetMessages=[], tasks=[], selections=[];
+function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) {
+    const callbacks={}, writes=[], midi=[], sysex=[], presetMessages=[], tasks=[], selections=[], bankScrolls=[];
     let project=[], uiTrack=null, uiDevice=null, tick=0, pending=false;
     const sources=[], proxies=[];
     function observable(initial) {
@@ -12,6 +12,15 @@ function createHarness({pinDelay=0,clampBanks=false}={}) {
     }
     function dynamic(getter) {
         const v=observable(getter()); sources.push(()=>v.set(getter())); return v;
+    }
+    function deviceEquality(getter) {
+        const v=observable(getter());
+        sources.push(()=>{
+            if(handoffEqualityDelay && context.navigator?.busy()) {
+                if(v.get()!==getter())schedule(()=>v.set(getter()),handoffEqualityDelay);
+            } else v.set(getter());
+        });
+        return v;
     }
     function schedule(fn,ms=0){tasks.push({fn,ms,at:tick+ms});}
     function refresh() {
@@ -36,7 +45,7 @@ function createHarness({pinDelay=0,clampBanks=false}={}) {
         const p={resolve,exists:()=>dynamic(()=>!!resolve()),name:()=>({addValueObserver(fn){if(isMain)callbacks.name=fn;dynamic(()=>resolve()?.name||'').addValueObserver(fn);}}),
             position:()=>dynamic(()=>parent(resolve())?.devices.indexOf(resolve())??-1),
             getDeviceChain:()=>trackProxy(()=>parent(resolve())),
-            createEqualsValue:other=>dynamic(()=>!!resolve()&&resolve()===other.resolve()),
+            createEqualsValue:other=>deviceEquality(()=>!!resolve()&&resolve()===other.resolve()),
             addDirectParameterIdObserver(fn){idsListener=fn;if(isMain)callbacks.ids=fn;fn(resolve()?.ids||[]);},
             addDirectParameterNormalizedValueObserver(fn){valueListener=fn;if(isMain)callbacks.value=fn;},
             addDirectParameterValueDisplayObserver(n,fn){if(isMain)callbacks.display=fn;return{setObservedParameterIds:ids=>callbacks.observed=ids};},
@@ -74,7 +83,7 @@ function createHarness({pinDelay=0,clampBanks=false}={}) {
         scheduleTask:schedule,sendDatagramPacket:()=>{},defineController:()=>{},defineMidiPorts:()=>{},addDeviceNameBasedDiscoveryPair:()=>{},
         getMidiOutPort:()=>({sendMidi:(...args)=>midi.push(args),sendSysex:s=>sysex.push(s)}),
         getMidiInPort:()=>({setMidiCallback:fn=>callbacks.midi=fn,createNoteInput:()=>({setShouldConsumeEvents:()=>{},sendRawMidiEvent:(...args)=>presetMessages.push(args)})}),
-        createCursorTrack,createTrackBank(n,sends,scenes,flat){if(n!==1||!flat)throw Error('Expected flat paged track bank');let offset=0;const pos=observable(0),set=pos.set;pos.set=v=>{offset=v;set(v);changed();};return{scrollPosition:()=>pos,itemCount:()=>dynamic(()=>project.length),getItemAt:()=>trackProxy(()=>project[offset]||null)};}
+        createCursorTrack,createTrackBank(n,sends,scenes,flat){if(n!==1||!flat)throw Error('Expected flat paged track bank');let offset=0;const pos=observable(0),set=pos.set;pos.set=v=>{bankScrolls.push(v);offset=v;set(v);changed();};return{scrollPosition:()=>pos,itemCount:()=>dynamic(()=>project.length),getItemAt:()=>trackProxy(()=>project[offset]||null)};}
     }};
     vm.createContext(context);
     context.load=file=>vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),context,{filename:file});
@@ -91,7 +100,7 @@ function createHarness({pinDelay=0,clampBanks=false}={}) {
         const obj=plugin(name,Object.values(parameters),values);project=[{name:'Test Track',devices:name?[obj]:[]}];select(0);drain();context.flush();
         // Existing regression fixtures can inject captured host callbacks directly.
     }
-    return {context,callbacks,writes,midi,sysex,presetMessages,remoteState,remotePage,pinned:main.c.pin,tasks,selections,
+    return {context,callbacks,writes,midi,sysex,presetMessages,remoteState,remotePage,pinned:main.c.pin,tasks,selections,bankScrolls,
         present:{set:v=>callbacksExists(v)},selectDevice,select,setProject,plugin,drain,changed,get target(){return main.c.dev;},get project(){return project;}};
     function callbacksExists(v){if(!v)selectDevice('',{});}
 }

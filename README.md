@@ -4,7 +4,7 @@ A Novation Launch Control XL 3 controller script that follows the selected Bitwi
 device, loads a preprogrammed profile when available, and falls back to Bitwig's
 Remote Controls for everything else. Written against Bitwig Studio 6.1.3 / API 18.
 
-The first custom profile is PolyChrome DSP Iroko. It preserves the guitar-effects
+Included custom profiles are PolyChrome DSP Iroko and Arturia Pigments. Iroko preserves the guitar-effects
 layout, grouped colors, value brightness, button feedback, and fader pickup.
 
 ## Install
@@ -55,6 +55,11 @@ power-1.5 curve. Button LEDs use 15% when off and 100% when on. Settings are in
 [`lib/settings.js`](lib/settings.js); effect hues belong to the device profile.
 Faders use pickup to avoid jumps after device changes or external edits.
 
+The Track buttons are lit when the project has tracks. A press immediately shows
+`Finding next plugin` or `Finding previous plugin` while discovery runs, followed
+by the destination plugin and track. Navigation errors also appear as an overlay
+so a recent knob display cannot hide them.
+
 Track navigation follows Bitwig's flattened track order, then main-chain device
 order. Group tracks, children of collapsed groups, return tracks and master are
 included; devices nested inside racks/layers are excluded. Bypassed plugins still
@@ -63,12 +68,18 @@ alone do not qualify. With no match, the display shows **No supported plugins**;
 with one instance, navigation stays there. From an unsupported device it chooses
 the nearest match in the requested direction, wrapping at the ends.
 
-Discovery uses metadata-only paged banks (one track and eight devices per window),
-scanning all pages without a project-size limit. Rapid presses queue in order;
-large projects take longer to scan. The script revalidates the destination using
-an independent pinned cursor, selects its track and exact device, and confirms
-the controller cursor before restoring the lock. Manual selection changes cancel
-pending discovery. A removed or moved destination cancels the handoff.
+The first navigation discovers supported plugins using metadata-only paged banks
+(one track and eight devices per window) and caches their locations. Later presses
+reuse that catalog and validate only the destination window. Track-count changes,
+observed device-list changes, and invalid destinations invalidate or rebuild the
+cache. **Shift + Track left/right** forces a fresh scan, useful after adding or
+moving plugins on tracks outside the current metadata window. The cache lasts
+until the controller reloads; the first scan can take longer on a large project.
+
+Rapid presses queue in order. The script captures an independent identity cursor
+for the destination, selects its track and exact device, and waits for cursor
+acknowledgment before restoring the lock. Manual selection changes cancel pending
+navigation.
 
 Parameter writes and preset commands pause during handoff. Pickup, button state
 and cached feedback reset even between identical plugin instances. The permanent
@@ -131,6 +142,14 @@ via Iroko's MIDI settings. A press shows **MIDI command sent**, not a confirmed
 preset name. The current API does not expose Iroko's internal preset name or a
 navigation acknowledgment. Plugin routing, MIDI channel, and actual previous/next
 behavior require a live check in your project.
+
+## Pigments profile
+
+Pigments uses captured direct parameter IDs with four encoder pages: Performance,
+Envelopes, LFOs, and Mixer + FX. Faders control macros 1–4, engine volumes, aux
+return and master volume. Buttons control filters and engine/FX bypasses.
+See [docs/PIGMENTS.md](docs/PIGMENTS.md) for the full layout, LED semantics and
+compatibility limits.
 
 ## Add a profile
 

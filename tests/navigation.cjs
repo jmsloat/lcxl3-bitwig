@@ -5,7 +5,7 @@ function fixture(options){
  c.registerLCXL3Profile({id:'test',name:'TEST',matchNames:['Test Synth'],requiredParameters:['Cutoff'],parameters:{Cutoff:'test/cutoff'},pages:[{name:'Tone',rows:Array.from({length:3},()=>Array(8).fill('Cutoff'))}],faders:Array(8).fill('Cutoff'),buttons:Array(16).fill(''),colors:{global:[127,0,127]}});
  h.iroko=()=>h.plugin('Iroko',Object.values(c.IROKO_PARAMETERS));
  h.synth=()=>h.plugin('Test Synth',['test/cutoff']);h.unknown=()=>h.plugin('Unknown',['unknown']);
- h.press=(direction,drain=true)=>{const cc=direction>0?102:103;h.callbacks.midi(0xb0,cc,127);h.callbacks.midi(0xb0,cc,0);if(drain)h.drain();};
+ h.press=(direction,drain=true,rescan=false)=>{if(rescan)h.callbacks.midi(0xb6,63,127);const cc=direction>0?102:103;h.callbacks.midi(0xb0,cc,127);h.callbacks.midi(0xb0,cc,0);if(rescan)h.callbacks.midi(0xb6,63,0);if(drain)h.drain();};
  h.track=(name,...devices)=>({name,devices});return h;
 }
 {
@@ -72,7 +72,7 @@ function fixture(options){
  tracks[1].type='group';tracks[1].collapsed=true;tracks[2].parent=tracks[1];tracks[33].type='return';tracks[34].type='master';
  h.setProject(tracks);h.press(1);assert.equal(h.target,b,'search crosses every track/device bank window');h.press(1);assert.equal(h.target,a);
  for(const index of [1,2,33])tracks[index].devices[9]=h.synth();h.changed();h.drain();
- h.press(1);assert.equal(h.target,tracks[1].devices[9]);h.press(1);assert.equal(h.target,tracks[2].devices[9]);h.press(1);assert.equal(h.target,tracks[33].devices[9]);h.press(1);assert.equal(h.target,b);
+ h.press(1,true,true);assert.equal(h.target,tracks[1].devices[9],'Shift + Track refreshes newly added plugins');h.press(1);assert.equal(h.target,tracks[2].devices[9]);h.press(1);assert.equal(h.target,tracks[33].devices[9]);h.press(1);assert.equal(h.target,b);
 }
 {
  const h=fixture({pinDelay:20}),a=h.iroko(),b=h.iroko();h.setProject([h.track('A',a),h.track('B',b)]);
@@ -96,5 +96,55 @@ function fixture(options){
  const h=fixture({clampBanks:true}),a=h.iroko(),b=h.iroko();
  h.setProject([h.track('Long chain',a,...Array.from({length:19},()=>h.unknown()),b)]);
  h.press(1);assert.equal(h.target,b,'clamped final bank windows remain searchable');h.press(-1);assert.equal(h.target,a);
+}
+// Physical navigation needs immediate visible acknowledgment while discovery
+// runs, even when a knob's temporary display is still on the hardware screen.
+{
+ const h=fixture(),a=h.plugin('Pigments',Object.values(h.context.PIGMENTS_PARAMETERS)),b=h.iroko();
+ h.setProject([h.track('Synth',a),h.track('Guitar',b)]);
+ for(const cc of [102,103])assert.ok(h.midi.some(m=>m[0]===0xb0&&m[1]===cc&&m[2]===3),'Track buttons are lit');
+ const overlay=()=>h.sysex.map(s=>Buffer.from(s,'hex')).filter(b=>b[6]===6&&b[7]===54).slice(-2).map(b=>b.subarray(9,-1).toString());
+ h.press(1,false);
+ assert.deepEqual(overlay(),['Finding next plugin','Synth'],'physical press is acknowledged before asynchronous scanning');
+ h.drain();assert.equal(h.target,b);assert.deepEqual(overlay(),['Iroko','Guitar']);
+ assert.equal(h.context.activeProfile.id,'iroko');
+ h.press(-1,false);assert.deepEqual(overlay(),['Finding previous plugin','Guitar']);
+ h.drain();assert.equal(h.target,a);assert.equal(h.context.activeProfile.id,'pigments');
+ assert.deepEqual(overlay(),['Pigments','Synth'],'destination overlay identifies plugin and track');
+}
+{
+ const h=fixture(),a=h.iroko(),b=h.synth();
+ h.setProject([h.track('A',a),...Array.from({length:25},(_,i)=>h.track('Empty '+i)),h.track('B',b)]);
+ h.press(1);assert.equal(h.target,b);assert.equal(h.context.navigator.status().scans,1);
+ h.bankScrolls.length=0;h.press(-1);assert.equal(h.target,a);
+ assert.equal(h.context.navigator.status().scans,1,'repeat navigation reuses discovery results');
+ assert.ok(h.bankScrolls.length<=2,'cached navigation reads only the destination window');
+ assert.ok(h.bankScrolls.every(t=>t===0),'cached navigation does not traverse unrelated tracks');
+ h.press(1);assert.equal(h.target,b);assert.equal(h.context.navigator.status().cacheHits,2);
+ // Missing cached destination rebuilds before choosing a supported replacement.
+ h.project[0].devices=[h.unknown()];h.changed();h.drain();h.press(-1);
+ assert.equal(h.target,b);assert.equal(h.context.navigator.status().scans,2,'stale cached target triggers a rescan');
+ // Track-count changes invalidate the metadata cache automatically.
+ const c=h.iroko();h.project.push(h.track('New',c));h.changed();h.drain();h.press(1);
+ assert.equal(h.target,c);assert.equal(h.context.navigator.status().scans,3);
+ // Additions inside an existing chain are explicitly refreshed with Shift+Track.
+ const d=h.synth();h.project[h.project.length-1].devices.push(d);h.changed();h.drain();
+ h.press(1,true,true);assert.equal(h.target,d);assert.equal(h.context.navigator.status().scans,4);
+}
+{
+ const h=fixture({handoffEqualityDelay:250}),a=h.iroko(),b=h.synth();
+ h.setProject([h.track('A',a),h.track('B',b)]);
+ h.press(1);assert.equal(h.target,b);
+ assert.equal(h.context.navigator.status().lastResult.destination.name,'Test Synth');
+ assert.equal(h.context.navigator.status().lastResult.cancelled,undefined,'late cursor acknowledgments do not cancel successful selection');
+ h.press(-1);assert.equal(h.target,a);assert.equal(h.context.navigator.status().lastResult.cached,true);
+}
+{
+ const h=fixture(),a=h.iroko(),b=h.iroko(),c=h.iroko();
+ h.setProject([h.track('A',a),h.track('B',b),h.track('C',c)]);
+ h.press(1);assert.equal(h.target,b);
+ h.select(2);h.drain();h.press(1);
+ assert.equal(h.target,a,'manual selection between identical profiles updates the cached origin');
+ assert.equal(h.context.navigator.status().scans,1,'manual selection preserves the plugin catalog');
 }
 console.log('PASS: supported-instance ordering, wraps, duplicates, generic origin, profile memory, queue edges, pinned targets, no-match, main-chain scope, stale identity, manual cancellation, handoff write gate/pickup, large paged projects.');
