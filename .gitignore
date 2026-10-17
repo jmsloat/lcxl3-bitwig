@@ -1,0 +1,8 @@
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+controller-diagnostics.json
+selected-device-parameters.json
+*.log
+*.tmp

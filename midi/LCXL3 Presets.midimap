@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MIDIMAP pluginName="Iroko" pluginVersion="1.1">
+  <MAP type="5" ccNum="43" channel="1" command="4"/>
+  <MAP type="5" ccNum="44" channel="1" command="5"/>
+</MIDIMAP>
