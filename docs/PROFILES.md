@@ -31,6 +31,10 @@ Call `registerLCXL3Profile({...})` from a file loaded by the entry point:
   `"normalized"` consistently shows 0–100% positions. By default the engine uses
   current host-formatted values with a percentage fallback.
 - `requiredParameters`: signature names that must exist before activating.
+- `parameterSteps`: optional `{ 'Resolved Name': numberOfStates }` for selectors
+  with known, evenly normalized states. Each encoder detent advances one state;
+  Shift retains whole-state steps. This prevents a plugin rounding small
+  continuous increments back to the same state. Counts must be integers >= 2.
 - `pages`: named pages, each with exactly three arrays of eight binding names.
 - `faders`: exactly eight names. Use an empty string for an unassigned slot.
 - `buttons`: exactly sixteen names, top row followed by bottom row.
@@ -90,4 +94,5 @@ are registered.
 Button parameter bindings use binary 0/1 toggles. Discrete controls with more
 than two states need an additional action type before they can be bound to a
 button; don't pretend an arbitrary enum is a binary toggle. Encoder bindings
-adjust normalized values, so continuous and stepped host parameters both work.
+adjust normalized values; use `parameterSteps` for known selectors that round
+small normalized increments away.
