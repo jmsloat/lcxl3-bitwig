@@ -10,11 +10,15 @@ Route: inline; model-schema mapping delegated read-only. Runner: `node tests/vox
 
 ## Tasks
 
-- T1 [S1–S3] inline — pending: generate hardware-ready preset, test model/slot/snapshot invariants and preserve Orange. Work-unit commit pending.
-- T2 [S1–S3] inline — pending: copy into Wine C drive, update bank Page and collect import/level listening results. Waiting on user is expected; no sound matching can be proven offline.
+- T1 [S1–S3] inline — complete in `7b5475e`: hardware-ready Vox preset, schema/slot/snapshot tests, full suite and vendor-resource checks passed. Orange unchanged. Risk: none; only new preset data and profile-local label change, no shared engine logic.
+- T2 [S1–S3] inline — copied into Wine C drive, label installed with backup and bank Page updated; Native import and level listening results pending. No sound matching can be proven offline.
 
 ## Log
 
 - L1: User: "what next? another amp?" Assistant proposed Vox Chime (Essex A30), shared controls and five roles, subtler modulation and independent level check. User: "okay."
 - L2: Vendor `res/amp.models:4813–4952` confirms HD2_AmpEssexA30, Cut and Presence but no Mid. Vendor `res/cabmicirs.models:1485–1596` confirms modern HD2_CabMicIr_2x12BlueBell. Knob 3 targets Cut in Vox, retaining Mid in Orange; shared display becomes Mid / Cut. Factory-linked cab is Silver Bell; Blue Bell is a deliberate Vox-style alternative.
 - L3: Preserve pre-existing dirty controller/navigation/harness/docs changes and Orange presets. Known stale effect LEDs after snapshot recall are deferred/non-blocking. Engram project resolves but reads/writes reject it; mirror pending.
+- L4: RED: `node tests/vox.cjs` failed on missing `07 Vox Chime.hlx`. GREEN: focused test and `npm test` passed after creation. Additional check parsed installed vendor amp/cab JSON and verified model-specific parameter keys/ranges. `git diff --check` passed. No native review assessment available: `gentle-ai` executable absent; no review approval claimed.
+- L5: Core/Pushed/Drive/Movement/Space gains start at .25/.40/.30/.23/.23. Output block starts at 0 dB, ChVol .74, Master 1.0. Blue Bell uses 121 Ribbon (modern Mic 5), Position .35, Distance 3, cuts 80–8000 Hz. Tremolo depth .18. These are listening starting points, not calibrated claims. Slot 3 maps Cut; all other assignments, shared effects, routing and bypass roles preserved and tested against Orange.
+- L6: Copied `C:\07 Vox Chime.hlx` without replacing an existing file; byte comparison passed. Installed label via `python3 tools/install.py`; backup `/home/jsloat/Bitwig Studio/Controller Script Backups/LCXL3 Effects-20261027T204439Z-cdef3e`. Installed profile byte comparison passed. Page https://chatgpt.com/space/page_58abf894e97c819190c488dc28ca02dd updated to pilot-generated/import-and-level-pending with Cut mapping. No push/PR; prior unrelated changes remain uncommitted. Authored changes about 100 lines excluding generated preset data, below chain heuristic.
+- L7: Next user check: import into an unused Native slot, keep plugin trims at 0 dB, play Core with the same guitar/strumming as Orange and report peak and relative loudness. Reload controller if the shared label has not refreshed. Then validate the remaining snapshot levels before proceeding to more amps.
