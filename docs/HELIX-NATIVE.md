@@ -11,7 +11,7 @@ tremolo are unchanged. Future presets should use subtler modulation.
 |---|---|
 | Top buttons 1–5 | Core, Pushed, Drive, Movement, Space |
 | Bottom buttons 1–5 | Compressor, drive, modulation, delay, reverb on/off |
-| Top encoders | Amp Gain, Bass, Mid, Treble, Presence, Amp Master, Amp Level, Comp Threshold |
+| Top encoders | Amp Gain, Bass, Mid / Cut, Treble, Presence, Amp Master, Amp Level, Comp Threshold |
 | Middle encoders | Drive Gain, Drive Tone, Drive Level, Mod Depth, Delay Time, Delay Feedback, Delay Mix, Reverb Mix |
 | Faders | Comp Threshold, Drive Gain, Drive Level, Mod Depth, Delay Mix, Reverb Mix, Amp Level, Master Output |
 
@@ -40,6 +40,32 @@ accepted +12 dB output-block setting; leave its fader alone during initial check
 - Snapshot selection uses host Snapshot Index, not MIDI routing. No extra preset
   control track is required. Device/profile selection performs no sound writes;
   snapshot selection intentionally recalls its gain and effect settings.
+
+## Vox Chime pilot
+
+Import `C:\07 Vox Chime.hlx` into an unused slot. It uses Essex A30 with a modern
+2x12 Blue Bell cab and 121 Ribbon mic. Knob 3 is Cut on Vox and Mid on Orange;
+the shared display reads Mid / Cut. All other automation slots and five snapshot
+roles stay in the same places. Orange is unchanged.
+
+This is an uncalibrated listening pilot: amp Channel Volume starts at 7.4 and
+the preset output block at 0 dB, not Orange's +12 dB. Keep Native's master input
+and output trims at 0 dB for comparison. First check Core with the same guitar
+and strumming used for Orange, then compare all five snapshots for perceived
+level and unwanted clipping. No level matching is claimed before that check.
+Movement retains the shared tremolo but reduces depth from 0.73 to 0.18.
+
+## Known issue: stale effect-toggle LEDs after snapshot recall
+
+Status: deferred; not a blocker for continuing the amp bank.
+
+In the user's Core → Drive test, Bitwig's exposed Switch 02 value does not
+change, although the preset stores drive bypass off in Core and on in Drive.
+The Drive toggle LED follows that exposed value and can therefore remain stale.
+Other snapshot-dependent effect toggles may have the same limitation; they have
+not been individually confirmed. Check bypass in Native rather than relying on
+effect-toggle colors after snapshot changes. No predicted-state workaround is
+being implemented. The boundary between Native and Bitwig remains undiagnosed.
 
 ## Verification
 

@@ -2,7 +2,7 @@
 var HELIX_BANK_KNOBS = [
     {name: "Amp Gain", target: "dsp0.block2.Drive", min: 0.18, max: 0.79},
     {name: "Bass", target: "dsp0.block2.Bass", min: 0, max: 1},
-    {name: "Mid", target: "dsp0.block2.Mid", min: 0, max: 1},
+    {name: "Mid / Cut", target: "dsp0.block2.Mid", min: 0, max: 1},
     {name: "Treble", target: "dsp0.block2.Treble", min: 0, max: 1},
     {name: "Presence", target: "dsp0.block2.Presence", min: 0, max: 1},
     {name: "Amp Master", target: "dsp0.block2.Master", min: 0, max: 1},
