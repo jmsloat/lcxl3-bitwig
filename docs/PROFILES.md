@@ -46,6 +46,12 @@ Call `registerLCXL3Profile({...})` from a file loaded by the entry point:
 - `layoutParameters`: names whose changes require resolving the layout again.
 - `buttonLabels`: optional friendly labels.
 - `buttonStates`: optional `{ 'Switch Name': ['Low State', 'High State'] }`.
+- `buttonActions`: optional button-index map of `{parameter, value, steps, label}`
+  for fixed-value selectors. Values are integer states within `steps`; actions
+  occupy the same button in both Shift layers and cannot overlap toggle/preset
+  bindings. Selected-state LEDs follow the host value, not the press/release edge.
+- `pickupResetParameters`: optional parameter names whose value changes rearm
+  fader pickup; discrete `parameterSteps` values are compared by state.
 - `alwaysOn`: optional names to keep enabled while the profile is active. This
   causes actual plugin writes and should be used deliberately.
 - `preset`: optional MIDI navigation configuration: `inputName` plus a `buttons`

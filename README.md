@@ -163,6 +163,13 @@ notes. Track navigation includes McRocklin alongside Iroko and Pigments.
 
 ## Add a profile
 
+### Helix Native bank pilot
+
+Helix Native now has a bank-specific profile with five snapshot selectors,
+sixteen encoder roles, five effect toggles and pickup faders. Import the separate
+hardware-ready Orange copy; arbitrary Native presets do not share its slot
+assignments. See [Helix Native controls and live checks](docs/HELIX-NATIVE.md).
+
 See [`docs/PROFILES.md`](docs/PROFILES.md) for the profile contract, parameter
 capture workflow, and a minimal example. Add a profile and its `load()` call to
 the entry point; the shared engine does not need plugin-specific edits.
