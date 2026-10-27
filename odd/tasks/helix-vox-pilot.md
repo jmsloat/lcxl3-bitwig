@@ -11,7 +11,7 @@ Route: inline; model-schema mapping delegated read-only. Runner: `node tests/vox
 ## Tasks
 
 - T1 [S1–S3] inline — complete in `7b5475e`: hardware-ready Vox preset, schema/slot/snapshot tests, full suite and vendor-resource checks passed. Orange unchanged. Risk: none; only new preset data and profile-local label change, no shared engine logic.
-- T2 [S1–S3] inline — copied into Wine C drive, label installed with backup and bank Page updated; Native import and level listening results pending. No sound matching can be proven offline.
+- T2 [S1–S3] inline — copied into Wine C drive, label installed with backup and bank Page updated; complete: Native import and all five snapshot levels accepted as a good starting point; Core ~−8 dBFS. User plans personal tweaks; no final tone or exact perceived-loudness match to Orange claimed. Acceptance record follows.
 
 ## Log
 
@@ -22,3 +22,7 @@ Route: inline; model-schema mapping delegated read-only. Runner: `node tests/vox
 - L5: Core/Pushed/Drive/Movement/Space gains start at .25/.40/.30/.23/.23. Output block starts at 0 dB, ChVol .74, Master 1.0. Blue Bell uses 121 Ribbon (modern Mic 5), Position .35, Distance 3, cuts 80–8000 Hz. Tremolo depth .18. These are listening starting points, not calibrated claims. Slot 3 maps Cut; all other assignments, shared effects, routing and bypass roles preserved and tested against Orange.
 - L6: Copied `C:\07 Vox Chime.hlx` without replacing an existing file; byte comparison passed. Installed label via `python3 tools/install.py`; backup `/home/jsloat/Bitwig Studio/Controller Script Backups/LCXL3 Effects-20261027T204439Z-cdef3e`. Installed profile byte comparison passed. Page https://chatgpt.com/space/page_58abf894e97c819190c488dc28ca02dd updated to pilot-generated/import-and-level-pending with Cut mapping. No push/PR; prior unrelated changes remain uncommitted. Authored changes about 100 lines excluding generated preset data, below chain heuristic.
 - L7: Next user check: import into an unused Native slot, keep plugin trims at 0 dB, play Core with the same guitar/strumming as Orange and report peak and relative loudness. Reload controller if the shared label has not refreshed. Then validate the remaining snapshot levels before proceeding to more amps.
+
+- L8 (2026-10-27): User: "around -8 - it sounds good." Response to Core listening check establishes import and Core tone/level acceptance. Leave gain unchanged; check Pushed/Drive/Movement/Space next for unwanted volume jumps. Page updated; Engram mirror still unavailable.
+
+- L9 (2026-10-27): User: "yeah. i'll tweak a bit but they're a good starting spot." Confirms all five snapshots are balanced enough as a starting point. T2 complete; no more gain/sound changes. Preserve user tweaks; obtain a new export before revising their version. Page acceptance status updated. Documentation-only structural check: `git diff --check` passed; no functional rerun needed because preset/code bytes are unchanged. Engram mirror pending.
