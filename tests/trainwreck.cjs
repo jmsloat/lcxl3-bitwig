@@ -1,0 +1,38 @@
+const assert = require('assert/strict');
+const fs = require('fs');
+const path = require('path');
+const folder = path.join(__dirname, '..', 'presets', 'helix-native');
+const source = JSON.parse(fs.readFileSync(path.join(folder, '04 Modern Clean Bank.hlx')));
+const candidate = JSON.parse(fs.readFileSync(path.join(folder, '12 Trainwreck Edge Bank.hlx')));
+const t = candidate.data.tone, s = source.data.tone, amp = t.dsp0.block2;
+assert.equal(candidate.data.meta.name, '12 Trainwreck');
+assert.equal(amp['@model'], 'HD2_AmpDerailedIngrid');
+const expectedAmp = {Drive: 0.22, Bass: 0.4, Mid: 0.55, Treble: 0.55, Presence: 0.48,
+    ChVol: 0.6, Master: 0.85, Sag: 0.5, Hum: 0.5, Ripple: 0.5, Bias: 0.6, BiasX: 0.5, Bright: 0};
+assert.deepEqual(Object.fromEntries(Object.entries(amp).filter(([k]) => !k.startsWith('@'))), expectedAmp);
+assert.equal(amp['@cab'], 'cab0');
+assert.deepEqual(t.dsp0.cab0, {'@enabled': true, '@model': 'HD2_CabMicIr_4x12CaliV30',
+    Angle: 0, Distance: 1, HighCut: 8000, Level: 0, LowCut: 80, Mic: 0, Position: 0.3});
+assert.equal(t.dsp0.outputA.gain, 0);
+assert.equal(t.dsp0.block1['@model'], 'HD2_DistTeemah');
+assert.equal(t.dsp0.block3['@model'], 'HD2_ReverbPlate');
+assert.equal(t.dsp0.block5.Intensity, 0.18);
+for (let i = 0; i < 8; i++) {
+    const expected = structuredClone(s['snapshot' + i]);
+    if (i < 5) {
+        expected.controllers.dsp0.block2.Drive['@value'] = [0.22, 0.38, 0.28, 0.2, 0.2][i];
+        expected.controllers.dsp0.block2.ChVol['@value'] = 0.6;
+    }
+    assert.deepEqual(t['snapshot' + i], expected, 'gain/volume tailored, role/bypass retained: ' + i);
+}
+for (const a of t.automation['@assignments'].filter(Boolean)) {
+    const value = a['@param'].split('.').reduce((obj, key) => obj[key], t);
+    assert.notEqual(value, undefined);
+    assert.ok(value >= a['@min'] && value <= a['@max']);
+}
+t.dsp0.block2 = s.dsp0.block2;
+t.dsp0.cab0 = s.dsp0.cab0;
+for (let i = 0; i < 5; i++) t['snapshot' + i] = s['snapshot' + i];
+candidate.data.meta = source.data.meta;
+assert.deepEqual(candidate, source, 'shared effects, routes, control assignments and all other data unchanged');
+console.log('PASS: Trainwreck model, cab/mic, five roles, independent levels and shared bank preservation.');
