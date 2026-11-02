@@ -147,4 +147,42 @@ function fixture(options){
  assert.equal(h.target,a,'manual selection between identical profiles updates the cached origin');
  assert.equal(h.context.navigator.status().scans,1,'manual selection preserves the plugin catalog');
 }
+// Repeat navigation uses retained identities, without moving metadata banks.
+// Time is the harness's virtual scheduler, not a hardware latency claim.
+{
+ const h=fixture(),a=h.iroko(),b=h.synth();
+ h.setProject([h.track('A',a),...Array.from({length:6},()=>h.track('Empty')),h.track('B',b)]);
+ h.press(1);h.bankScrolls.length=0;
+ const start=h.time;
+ h.press(-1,false);h.drain(()=>h.context.navigator.status().phase==='idle');
+ assert.equal(h.target,a);assert.deepEqual(h.bankScrolls,[],'retained target requires no bank scrolling');
+ assert.ok(h.time-start<=120,'cached switch removes redundant settling stages');h.drain();
+ // A replacement with identical names and IDs must not reuse the deleted identity.
+ const replacement=h.synth();h.project[7].devices=[replacement];h.changed();h.drain();
+ h.press(1);assert.equal(h.target,replacement);assert.equal(h.context.navigator.status().scans,2);
+}
+{
+ const h=fixture({handoffEqualityDelay:250,pinDelay:100}),a=h.iroko(),b=h.synth();
+ h.setProject([h.track('A',a),h.track('B',b)]);
+ h.callbacks.midi(0xb0,65,127);h.callbacks.midi(0xb0,65,0);h.drain();
+ h.press(1);const start=h.time;
+ h.press(-1,false);h.drain(()=>h.context.navigator.busy());
+ h.writes.length=0;h.callbacks.midi(0xbf,77,65);
+ assert.equal(h.writes.length,0,'fast cached path still blocks writes until acknowledgment');
+ h.drain(()=>h.context.navigator.status().phase==='idle');
+ assert.equal(h.target,a);assert.equal(h.pinned.get(),true);
+ assert.ok(h.time-start>=350,'destination and delayed lock must both acknowledge');h.drain();
+}
+{
+ const h=fixture(),a=h.iroko(),b=h.synth(),u=h.unknown();
+ h.setProject([h.track('A',a),h.track('B',b),h.track('Other',u)]);h.press(1);
+ h.press(-1,false);h.drain(()=>h.context.navigator.busy());h.select(2);h.drain();
+ assert.equal(h.target,u);assert.equal(h.context.navigator.status().message,'Selection changed','manual selection cancels retained handoff');
+}
+{
+ const h=fixture(),plugins=Array.from({length:18},()=>h.iroko());
+ h.setProject([h.track('Many',...plugins)]);h.press(-1);assert.equal(h.target,plugins[17]);
+ h.press(-1);assert.equal(h.target,plugins[16],'devices beyond the retained pool use validated bank fallback');
+ h.press(-1);assert.equal(h.target,plugins[15],'navigation crosses back into retained pool');
+}
 console.log('PASS: supported-instance ordering, wraps, duplicates, generic origin, profile memory, queue edges, pinned targets, no-match, main-chain scope, stale identity, manual cancellation, handoff write gate/pickup, large paged projects.');

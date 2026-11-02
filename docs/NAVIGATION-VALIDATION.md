@@ -54,3 +54,25 @@ the equality acknowledgment completed the handoff successfully. A controlled
 round trip between Iroko and Pigments then showed one discovery scan and one
 cache hit, with both handoffs complete. Temporary probes and diagnostics were
 removed afterward. Physical screen/LED confirmation still requires hands-on use.
+
+## Retained device references and switching latency
+
+Repeat navigation now selects the first 16 discovered instances through retained,
+pinned identity cursors. These proxies are allocated during initialization and
+reused on rescans; larger catalogs retain the validated bank-based fallback.
+Retained targets are checked for existence, device and track position, name,
+profile signature, and equality with the destination anchor. Removed or stale
+targets trigger discovery again. Track renames refresh destination feedback.
+
+Destination/profile readiness and restored lock state are checked after host
+update batches, with polling as a timeout fallback. Parameter writes remain
+blocked until those acknowledgments arrive. Discovery still uses metadata
+settling because its banks can receive partial updates.
+
+In the virtual scheduler, an eight-track project with two supported instances
+changed from 420 ms to 90 ms for a cached switch, and from one metadata-bank move
+to zero. Initial discovery changed from 1620 ms to 1530 ms. These are simulated
+script timings, excluding real Bitwig callback and hardware display latency.
+The regression suite additionally checks retained-reference deletion/replacement,
+manual cancellation, delayed equality and lock restoration, and catalogs larger
+than the retained pool. This revision still needs hands-on latency confirmation.

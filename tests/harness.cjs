@@ -69,7 +69,7 @@ function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) 
         const t=trackProxy(()=>c.track);
         t.selectChannel=other=>{c.track=other.resolve();changed();};
         t.createCursorDevice=()=>{
-            const d=deviceProxy(()=>c.dev,id==='lcxl3-iroko-track');
+            const d=deviceProxy(()=>project.some(t=>t.devices.includes(c.dev))?c.dev:null,id==='lcxl3-iroko-track');
             d.selectDevice=other=>{c.dev=other.resolve();c.track=parent(c.dev);changed();};
             d.isPinned=()=>c.pin;
             const set=c.pin.set;c.pin.set=v=>{
@@ -101,7 +101,7 @@ function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) 
         // Existing regression fixtures can inject captured host callbacks directly.
     }
     return {context,callbacks,writes,midi,sysex,presetMessages,remoteState,remotePage,pinned:main.c.pin,tasks,selections,bankScrolls,
-        present:{set:v=>callbacksExists(v)},selectDevice,select,setProject,plugin,drain,changed,get target(){return main.c.dev;},get project(){return project;}};
+        present:{set:v=>callbacksExists(v)},selectDevice,select,setProject,plugin,drain,changed,get target(){return main.c.dev;},get project(){return project;},get time(){return tick;}};
     function callbacksExists(v){if(!v)selectDevice('',{});}
 }
 module.exports={createHarness};

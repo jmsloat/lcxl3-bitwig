@@ -71,7 +71,10 @@ the nearest match in the requested direction, wrapping at the ends.
 
 The first navigation discovers supported plugins using metadata-only paged banks
 (one track and eight devices per window) and caches their locations. Later presses
-reuse that catalog and validate only the destination window. Track-count changes,
+reuse that catalog. The first 16 discovered instances retain pinned identity
+cursors, so repeat switches select them directly without moving the discovery
+bank. Additional instances use the validated destination-window fallback.
+Track-count changes,
 observed device-list changes, and invalid destinations invalidate or rebuild the
 cache. **Shift + Track left/right** forces a fresh scan, useful after adding or
 moving plugins on tracks outside the current metadata window. The cache lasts
@@ -80,7 +83,8 @@ until the controller reloads; the first scan can take longer on a large project.
 Rapid presses queue in order. The script captures an independent identity cursor
 for the destination, selects its track and exact device, and waits for cursor
 acknowledgment before restoring the lock. Manual selection changes cancel pending
-navigation.
+navigation. Destination and lock acknowledgment checks run after host update
+batches, without extra settling delays once those conditions are satisfied.
 
 Parameter writes and preset commands pause during handoff. Pickup, button state
 and cached feedback reset even between identical plugin instances. The permanent
