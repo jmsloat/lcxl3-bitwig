@@ -186,3 +186,56 @@ function fixture(options){
  h.press(-1);assert.equal(h.target,plugins[15],'navigation crosses back into retained pool');
 }
 console.log('PASS: supported-instance ordering, wraps, duplicates, generic origin, profile memory, queue edges, pinned targets, no-match, main-chain scope, stale identity, manual cancellation, handoff write gate/pickup, large paged projects.');
+
+{
+ const h=fixture(),a=h.iroko(),b=h.iroko(),c=h.synth();
+ const chain=h.unknown();chain.name='Killgate + Iroko';chain.slots={FX:{name:'FX',devices:[h.unknown(),b]}};
+ h.setProject([h.track('Guitar',a,chain,c)]);
+ h.press(1);assert.equal(h.target,b,'discover Iroko inside renamed Chain');
+ h.press(1);assert.equal(h.target,c,'nested device precedes following top-level device');
+ h.press(-1);assert.equal(h.target,b);h.press(-1);assert.equal(h.target,a);
+ h.press(-1);assert.equal(h.target,c,'backwards wraps');
+ assert.equal(h.writes.length,0,'nested discovery does not write parameters');
+}
+
+{
+ const h=fixture({clampBanks:true}),a=h.iroko(),b=h.iroko(),chain=h.unknown();
+ chain.slots={FX:{name:'FX',devices:[...Array.from({length:11},()=>h.unknown()),b]}};
+ h.setProject([h.track('Guitar',a,chain)]);h.press(1);assert.equal(h.target,b,'page through Chain children');
+ h.callbacks.midi(0xb0,65,127);h.callbacks.midi(0xb0,65,0);
+ h.press(1);assert.equal(h.target,a);h.press(-1);assert.equal(h.target,b);assert.equal(h.pinned.get(),true,'nested target preserves lock');
+ const lines=h.sysex.map(s=>Buffer.from(s,'hex')).filter(b=>b[6]===6&&b[7]===53).slice(-3).map(b=>b.subarray(9,-1).toString());
+ assert.equal(lines[0],'Guitar','display uses owning track, not FX slot');
+ const c=h.synth();chain.slots.FX.devices.push(c);h.changed();h.drain();h.press(1);assert.equal(h.target,c,'fresh discovery finds added children');
+ chain.slots.FX.devices.splice(11,1);h.changed();h.drain();h.press(-1);assert.equal(h.target,a,'removed child is not selected from cache');
+ assert.equal(h.writes.length,0);
+}
+{
+ const h=fixture(),plugins=Array.from({length:18},()=>h.iroko()),chain=h.unknown();
+ chain.slots={FX:{name:'FX',devices:plugins}};
+ h.setProject([h.track('Nested only',chain)]);
+ for(const p of plugins){h.press(1);assert.equal(h.target,p,'nested instances beyond retained cursor pool');}
+ h.press(1);assert.equal(h.target,plugins[0]);h.press(-1);assert.equal(h.target,plugins[17]);
+ // Manual nested selection must locate the origin's hierarchical position.
+ h.select(0);h.drain();h.press(-1);assert.equal(h.target,plugins[17]);
+}
+{
+ const h=fixture(),a=h.iroko(),b=h.iroko(),chain=h.unknown();
+ chain.slots={FX:{name:'FX',devices:[b]}};
+ h.setProject([h.track('A',a,chain),...Array.from({length:3},()=>h.track('Empty',h.unknown()))]);
+ h.press(1,false);h.drain(()=>h.context.navigator.status().destination?.child===0);
+ chain.slots.FX.devices[0]=h.iroko();h.changed();h.drain();
+ assert.equal(h.target,a,'lookalike replacement cannot steal a captured identity');
+ assert.equal(h.context.navigator.status().message,'Plugins changed');assert.equal(h.selections.length,0);
+}
+console.log('PASS: Chain discovery, ordering, empty slots, paging, locks, track labels, edits and stale nested identity');
+
+{
+ const h=fixture(),a=h.iroko(),b=h.iroko(),empty=h.unknown(),multi=h.unknown(),chain=h.unknown();
+ empty.slots={FX:{name:'FX',devices:[]}};
+ multi.slots={Pre:{name:'Pre',devices:[h.iroko()]},Post:{name:'Post',devices:[]}};
+ chain.slots={FX:{name:'FX',devices:[b]}};
+ h.setProject([h.track('Guitar',a,empty,multi,chain)]);h.press(1);
+ assert.equal(h.target,b,'empty Chain is skipped, ambiguous multi-slot containers excluded');
+ assert.equal(h.writes.length,0);
+}

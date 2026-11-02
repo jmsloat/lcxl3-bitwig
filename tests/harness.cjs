@@ -39,19 +39,35 @@ function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) 
         getName(){return this.name;},selectedPageIndex(){return this.index;},pageCount(){return this.count;},
         getParameter:i=>({name:()=>remoteState[i].name,exists:()=>remoteState[i].exists,value:()=>remoteState[i].value}),
         selectNextPage(){this.index.set(this.index.get()+1);},selectPreviousPage(){this.index.set(this.index.get()-1);}};
-    function parent(d){return project.find(t=>t.devices.includes(d))||d?.parent||null;}
+    function locateDevice(d) {
+        function visit(chain, track) {
+            if(chain.devices.includes(d))return {chain,track};
+            for(const device of chain.devices)for(const slot of Object.values(device.slots||{})) {
+                const found=visit(slot,track);if(found)return found;
+            }
+            return null;
+        }
+        if(!d)return null;
+        for(const track of project){const found=visit(track,track);if(found)return found;}
+        return null;
+    }
+    function parent(d){return locateDevice(d)?.chain||null;}
+    function owner(d){return locateDevice(d)?.track||null;}
     function deviceProxy(resolve,isMain=false) {
         let previous=null, idKey='', idsListener, valueListener;
         const p={resolve,exists:()=>dynamic(()=>!!resolve()),name:()=>({addValueObserver(fn){if(isMain)callbacks.name=fn;dynamic(()=>resolve()?.name||'').addValueObserver(fn);}}),
             position:()=>dynamic(()=>parent(resolve())?.devices.indexOf(resolve())??-1),
             getDeviceChain:()=>trackProxy(()=>parent(resolve())),
+            slotNames:()=>({addValueObserver(fn){let last; sources.push(()=>{const names=Object.keys(resolve()?.slots||{}),key=JSON.stringify(names);if(key!==last){last=key;fn(names);}});fn(Object.keys(resolve()?.slots||{}));}}),
+            getCursorSlot:()=>trackProxy(()=>Object.values(resolve()?.slots||{})[0]||null),
+            selectFirstInSlot(){throw Error('Discovery must not depend on asynchronous slot cursor moves');},
             createEqualsValue:other=>deviceEquality(()=>!!resolve()&&resolve()===other.resolve()),
             addDirectParameterIdObserver(fn){idsListener=fn;if(isMain)callbacks.ids=fn;fn(resolve()?.ids||[]);},
             addDirectParameterNormalizedValueObserver(fn){valueListener=fn;if(isMain)callbacks.value=fn;},
             addDirectParameterValueDisplayObserver(n,fn){if(isMain)callbacks.display=fn;return{setObservedParameterIds:ids=>callbacks.observed=ids};},
             createCursorRemoteControlsPage:()=>remotePage,
             setDirectParameterValueNormalized(...args){writes.push(['set',...args]);if(resolve())resolve().values[args[0]]=args[1]/(args[2]-1);},
-            selectInEditor(){uiDevice=resolve();uiTrack=parent(uiDevice);selections.push(uiDevice);follow();changed();},
+            selectInEditor(){uiDevice=resolve();uiTrack=owner(uiDevice);selections.push(uiDevice);follow();changed();},
             refresh(){const d=resolve(),key=JSON.stringify(d?.ids||[]);if(key!==idKey){idKey=key;if(idsListener)idsListener(d?.ids||[]);}if(d!==previous){previous=d;if(valueListener&&d)for(const id of d.ids)valueListener(id,d.values[id]??0.5);}}
         };proxies.push(p);return p;
     }
@@ -69,8 +85,8 @@ function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) 
         const t=trackProxy(()=>c.track);
         t.selectChannel=other=>{c.track=other.resolve();changed();};
         t.createCursorDevice=()=>{
-            const d=deviceProxy(()=>project.some(t=>t.devices.includes(c.dev))?c.dev:null,id==='lcxl3-iroko-track');
-            d.selectDevice=other=>{c.dev=other.resolve();c.track=parent(c.dev);changed();};
+            const d=deviceProxy(()=>locateDevice(c.dev)?c.dev:null,id==='lcxl3-iroko-track');
+            d.selectDevice=other=>{c.dev=other.resolve();c.track=owner(c.dev);changed();};
             d.isPinned=()=>c.pin;
             const set=c.pin.set;c.pin.set=v=>{
                 const apply=()=>{set(v);if(!v&&c.follow){c.dev=uiDevice;changed();}};

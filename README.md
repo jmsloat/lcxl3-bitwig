@@ -63,7 +63,10 @@ so a recent knob display cannot hide them.
 
 Track navigation follows Bitwig's flattened track order, then main-chain device
 order. Group tracks, children of collapsed groups, return tracks and master are
-included; devices nested inside racks/layers are excluded. Bypassed plugins still
+included. Discovery also searches one level of single-slot containers, including plugins
+inside a **Chain** (for example, Killgate followed by Iroko). Renaming the Chain
+preset does not affect matching. Multi-slot devices, layers, drum pads, and containers nested inside
+another container are not traversed. Bypassed plugins still
 qualify when their name and parameter signature match. Generic Remote Controls
 alone do not qualify. With no match, the display shows **No supported plugins**;
 with one instance, navigation stays there. From an unsupported device it chooses
@@ -71,7 +74,9 @@ the nearest match in the requested direction, wrapping at the ends.
 
 The first navigation discovers supported plugins using metadata-only paged banks
 (one track and eight devices per window) and caches their locations. Later presses
-reuse that catalog. The first 16 discovered instances retain pinned identity
+reuse that catalog for top-level-only projects. Projects with single-slot containers are
+rescanned on each navigation press so changes inside a Chain are not hidden by
+stale cached paths; this can make navigation slower. The first 16 discovered instances retain pinned identity
 cursors, so repeat switches select them directly without moving the discovery
 bank. Additional instances use the validated destination-window fallback.
 Track-count changes,
