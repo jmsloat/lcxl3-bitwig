@@ -9,6 +9,37 @@ function fixture(options){
  h.track=(name,...devices)=>({name,devices});return h;
 }
 {
+ const storedCursorModes=Object.fromEntries(['origin','destination','slot-discovery','slot-parent','selection-origin'].map(id=>['lcxl3-nav-'+id,0]));
+ const h=fixture({storedCursorModes}),origin=h.iroko(),nested=h.synth(),chain=h.unknown();
+ chain.slots={FX:{name:'FX',devices:[nested]}};
+ h.setProject([h.track('Origin',origin),h.track('Destination',chain)]);h.press(1);
+ assert.equal(h.target,nested,'saved selection-following private cursors must not leak selection after upgrade');
+ assert.equal(h.context.navigator.status().lastResult.cancelled,undefined);
+ assert.ok(h.cursorMoves.filter(m=>m.id!=='lcxl3-iroko-track').every(m=>m.mode===1),'private cursors must actually use the new mode, not just request it');
+ assert.equal(storedCursorModes['lcxl3-iroko-device'],0,'main controller selection-following identity must stay unchanged');
+}
+{
+ const h=fixture({privatePinDelay:100}),a=h.iroko(),first=h.synth(),later=h.iroko();
+ const unused=h.unknown();unused.slots={FX:{name:'FX',devices:[]}};
+ h.setProject([h.track('Origin',a),h.track('Destination',h.unknown(),first,later,unused),h.track('Unrelated',h.iroko())],0,0,false);
+ h.drain(()=>h.context.navigator.status().tracks===3);
+ h.press(1);assert.equal(h.target,first,'first supported plugin on the next eligible track wins');
+ assert.equal(h.context.navigator.status().lastResult.cancelled,undefined,'private cursor moves must not cancel navigation');
+ assert.equal(h.slotEntries.length,0,'stop before opening containers after the first match');
+ assert.ok(h.bankScrolls.every(t=>t<2),'do not search tracks after the destination');
+ assert.ok(h.cursorMoves.filter(m=>m.id!=='lcxl3-iroko-track').every(m=>m.mode===1),'unassigned private cursors must position in isolated mode before pinning');
+ h.press(-1);assert.equal(h.target,a,'reverse navigation changes tracks, not plugin order');
+ h.select(1,2);h.drain();h.press(1);assert.equal(h.target,h.project[2].devices[0],'manually selected later plugins do not become extra navigation stops');
+}
+{
+ const h=fixture({privatePinDelay:100}),origin=h.iroko(),old=h.unknown(),replacement=h.unknown(),first=h.iroko(),second=h.synth();
+ old.slots={FX:{name:'FX',devices:[first]}};replacement.slots={FX:{name:'FX',devices:[second]}};
+ h.setProject([h.track('Origin',origin),h.track('Destination',old)]);h.press(1);assert.equal(h.target,first);
+ h.press(-1);assert.equal(h.target,origin);h.project[1].devices=[replacement];h.changed();h.drain();
+ h.press(1);assert.equal(h.target,second,'private cursors must recover after their previous target is removed');
+ assert.equal(h.context.navigator.status().lastResult.cancelled,undefined);
+}
+{
  const h=fixture(),a=h.iroko(),b=h.iroko(),u=h.unknown();
  b.enabled=false;
  h.setProject([h.track('Guitar A',a),h.track('Unsupported',u),h.track('Guitar B',b)]);
@@ -21,7 +52,7 @@ function fixture(options){
 }
 {
  const h=fixture(),a=h.iroko(),b=h.iroko(),s=h.synth();
- h.setProject([h.track('Same track',a,h.unknown(),s,b)]);
+ h.setProject([h.track('First',a,h.unknown(),h.iroko()),h.track('Synth',s),h.track('Last',b)]);
  h.context.page=2;h.press(1);assert.equal(h.target,s);h.press(1);assert.equal(h.target,b);assert.equal(h.context.page,2,'profile page memory survives mixed profiles');
  h.press(-1);assert.equal(h.target,s);h.press(-1);assert.equal(h.target,a);
  h.press(1,false);h.press(1,false);h.press(-1,false);h.drain();assert.equal(h.target,s,'rapid presses run in order');
@@ -93,8 +124,17 @@ function fixture(options){
  h.setProject([h.track('Empty'),h.track('A',a)]);h.press(1,false);h.drain(()=>h.context.navigator.status().scannedTrack===1);h.select(1);h.drain();assert.equal(h.context.navigator.status().message,'Selection changed','manual selection from empty origin cancels discovery');
 }
 {
+ const h=fixture(),a=h.iroko(),b=h.synth();
+ h.setProject([h.track('Empty'),h.track('A',a),h.track('B',b)]);
+ h.press(1);assert.equal(h.target,a);h.press(1);assert.equal(h.target,b);
+ h.select(0);h.drain();const state=JSON.stringify(h.project);h.press(1);
+ assert.equal(h.target,a,'an empty origin must not reuse a stale same-origin shortcut');
+ assert.equal(h.context.navigator.status().lastResult.cancelled,undefined);
+ assert.equal(JSON.stringify(h.project),state);assert.equal(h.writes.length,0);
+}
+{
  const h=fixture({clampBanks:true}),a=h.iroko(),b=h.iroko();
- h.setProject([h.track('Long chain',a,...Array.from({length:19},()=>h.unknown()),b)]);
+ h.setProject([h.track('Origin',a),h.track('Long chain',...Array.from({length:19},()=>h.unknown()),b)]);
  h.press(1);assert.equal(h.target,b,'clamped final bank windows remain searchable');h.press(-1);assert.equal(h.target,a);
 }
 // Physical navigation needs immediate visible acknowledgment while discovery
@@ -115,21 +155,14 @@ function fixture(options){
 {
  const h=fixture(),a=h.iroko(),b=h.synth();
  h.setProject([h.track('A',a),...Array.from({length:25},(_,i)=>h.track('Empty '+i)),h.track('B',b)]);
- h.press(1);assert.equal(h.target,b);assert.equal(h.context.navigator.status().scans,1);
- h.bankScrolls.length=0;h.press(-1);assert.equal(h.target,a);
- assert.equal(h.context.navigator.status().scans,1,'repeat navigation reuses discovery results');
- assert.ok(h.bankScrolls.length<=2,'cached navigation reads only the destination window');
- assert.ok(h.bankScrolls.every(t=>t===0),'cached navigation does not traverse unrelated tracks');
- h.press(1);assert.equal(h.target,b);assert.equal(h.context.navigator.status().cacheHits,2);
- // Missing cached destination rebuilds before choosing a supported replacement.
- h.project[0].devices=[h.unknown()];h.changed();h.drain();h.press(-1);
- assert.equal(h.target,b);assert.equal(h.context.navigator.status().scans,2,'stale cached target triggers a rescan');
- // Track-count changes invalidate the metadata cache automatically.
- const c=h.iroko();h.project.push(h.track('New',c));h.changed();h.drain();h.press(1);
- assert.equal(h.target,c);assert.equal(h.context.navigator.status().scans,3);
- // Additions inside an existing chain are explicitly refreshed with Shift+Track.
- const d=h.synth();h.project[h.project.length-1].devices.push(d);h.changed();h.drain();
- h.press(1,true,true);assert.equal(h.target,d);assert.equal(h.context.navigator.status().scans,4);
+ h.press(1);assert.equal(h.target,b);h.press(-1);assert.equal(h.target,a);
+ assert.equal(h.context.navigator.status().scans,2,'each navigation scans only until its first eligible track');
+ h.press(1);h.project[0].devices=[h.unknown()];h.changed();h.drain();h.press(-1);
+ assert.equal(h.target,b,'removed targets are not reused from an instance catalog');
+ const c=h.iroko();h.project.push(h.track('New',c));h.changed();h.drain();h.press(1);assert.equal(h.target,c);
+ const d=h.synth();h.project[h.project.length-1].devices.unshift(d);h.changed();h.drain();
+ h.press(-1);assert.equal(h.target,b);h.press(1,true,true);
+ assert.equal(h.target,d,'fresh per-track scanning observes a new first supported device');
 }
 {
  const h=fixture({handoffEqualityDelay:250}),a=h.iroko(),b=h.synth();
@@ -137,29 +170,26 @@ function fixture(options){
  h.press(1);assert.equal(h.target,b);
  assert.equal(h.context.navigator.status().lastResult.destination.name,'Test Synth');
  assert.equal(h.context.navigator.status().lastResult.cancelled,undefined,'late cursor acknowledgments do not cancel successful selection');
- h.press(-1);assert.equal(h.target,a);assert.equal(h.context.navigator.status().lastResult.cached,true);
+ h.press(-1);assert.equal(h.target,a);assert.equal(h.context.navigator.status().lastResult.cancelled,undefined);
 }
 {
  const h=fixture(),a=h.iroko(),b=h.iroko(),c=h.iroko();
  h.setProject([h.track('A',a),h.track('B',b),h.track('C',c)]);
  h.press(1);assert.equal(h.target,b);
  h.select(2);h.drain();h.press(1);
- assert.equal(h.target,a,'manual selection between identical profiles updates the cached origin');
- assert.equal(h.context.navigator.status().scans,1,'manual selection preserves the plugin catalog');
+ assert.equal(h.target,a,'manual selection between identical profiles updates the navigation origin');
+ assert.equal(h.context.navigator.status().scans,2,'manual selection establishes the next navigation origin');
 }
-// Repeat navigation uses retained identities, without moving metadata banks.
-// Time is the harness's virtual scheduler, not a hardware latency claim.
+// Repeated navigation validates live identities rather than cached instances.
 {
  const h=fixture(),a=h.iroko(),b=h.synth();
  h.setProject([h.track('A',a),...Array.from({length:6},()=>h.track('Empty')),h.track('B',b)]);
  h.press(1);h.bankScrolls.length=0;
- const start=h.time;
  h.press(-1,false);h.drain(()=>h.context.navigator.status().phase==='idle');
- assert.equal(h.target,a);assert.deepEqual(h.bankScrolls,[],'retained target requires no bank scrolling');
- assert.ok(h.time-start<=120,'cached switch removes redundant settling stages');h.drain();
+ assert.equal(h.target,a);h.drain();
  // A replacement with identical names and IDs must not reuse the deleted identity.
  const replacement=h.synth();h.project[7].devices=[replacement];h.changed();h.drain();
- h.press(1);assert.equal(h.target,replacement);assert.equal(h.context.navigator.status().scans,2);
+ h.press(1);assert.equal(h.target,replacement);assert.equal(h.context.navigator.status().scans,3);
 }
 {
  const h=fixture({handoffEqualityDelay:250,pinDelay:100}),a=h.iroko(),b=h.synth();
@@ -168,7 +198,7 @@ function fixture(options){
  h.press(1);const start=h.time;
  h.press(-1,false);h.drain(()=>h.context.navigator.busy());
  h.writes.length=0;h.callbacks.midi(0xbf,77,65);
- assert.equal(h.writes.length,0,'fast cached path still blocks writes until acknowledgment');
+ assert.equal(h.writes.length,0,'handoff path still blocks writes until acknowledgment');
  h.drain(()=>h.context.navigator.status().phase==='idle');
  assert.equal(h.target,a);assert.equal(h.pinned.get(),true);
  assert.ok(h.time-start>=350,'destination and delayed lock must both acknowledge');h.drain();
@@ -177,52 +207,74 @@ function fixture(options){
  const h=fixture(),a=h.iroko(),b=h.synth(),u=h.unknown();
  h.setProject([h.track('A',a),h.track('B',b),h.track('Other',u)]);h.press(1);
  h.press(-1,false);h.drain(()=>h.context.navigator.busy());h.select(2);h.drain();
- assert.equal(h.target,u);assert.equal(h.context.navigator.status().message,'Selection changed','manual selection cancels retained handoff');
+ assert.equal(h.target,u);assert.equal(h.context.navigator.status().message,'Selection changed','manual selection cancels pending handoff');
 }
 {
  const h=fixture(),plugins=Array.from({length:18},()=>h.iroko());
- h.setProject([h.track('Many',...plugins)]);h.press(-1);assert.equal(h.target,plugins[17]);
- h.press(-1);assert.equal(h.target,plugins[16],'devices beyond the retained pool use validated bank fallback');
- h.press(-1);assert.equal(h.target,plugins[15],'navigation crosses back into retained pool');
+ h.setProject([h.track('Many',...plugins)]);h.press(-1);assert.equal(h.target,plugins[0]);
+ h.press(1);assert.equal(h.target,plugins[0],'one eligible track always uses its first supported device');
+ assert.equal(h.selections.length,0,'an already selected first device is not reselected');
 }
-console.log('PASS: supported-instance ordering, wraps, duplicates, generic origin, profile memory, queue edges, pinned targets, no-match, main-chain scope, stale identity, manual cancellation, handoff write gate/pickup, large paged projects.');
+console.log('PASS: first-supported-device track ordering, wraps, ignored duplicates, generic origin, profile memory, queue edges, pinned targets, no-match, stale identity, manual cancellation, handoff gates, paged projects and isolated private cursors.');
+
+for(const slotEntryDelay of [30,60,180]) {
+ const h=fixture({slotEntryDelay}),chain=h.unknown(),iroko=h.iroko();
+ chain.name='Chain';chain.slots={FX:{name:'FX',devices:[h.unknown(),iroko]}};
+ h.setProject([h.track('Guitar',chain)],0,0,false);
+ h.drain(()=>h.context.navigator.status().destination?.child===1);
+ assert.equal(h.context.navigator.status().destination?.child,1,'discover Iroko without a UI-selected Chain slot');
+ assert.equal(h.target,chain,'discovery must not move the controlled device');
+ assert.equal(h.selections.length,0,'discovery must not select device headers');
+ assert.equal(h.writes.length,0,'discovery must not write plugin parameters');
+ assert.equal(chain.selectedSlot,undefined,'discovery must not change UI slot selection');
+ h.drain();assert.equal(h.target,iroko);assert.equal(h.context.activeProfile.id,'iroko');
+ assert.equal(h.context.navigator.status().lastResult.matches,1);
+ assert.equal(h.context.navigator.status().message,'');
+}
+{
+ const h=fixture({slotEntryDelay:180}),first=h.iroko(),chain=h.unknown(),nested=h.iroko();
+ chain.slots={FX:{name:'FX',devices:[nested]}};chain.selectedSlot='FX';
+ h.setProject([h.track('Guitar',first,chain)]);h.press(1);
+ assert.equal(h.target,first,'first top-level match wins over a later Chain');
+ assert.equal(h.context.navigator.status().lastResult.matches,1);assert.equal(h.slotEntries.length,0);
+}
 
 {
  const h=fixture(),a=h.iroko(),b=h.iroko(),c=h.synth();
  const chain=h.unknown();chain.name='Killgate + Iroko';chain.slots={FX:{name:'FX',devices:[h.unknown(),b]}};
- h.setProject([h.track('Guitar',a,chain,c)]);
- h.press(1);assert.equal(h.target,b,'discover Iroko inside renamed Chain');
- h.press(1);assert.equal(h.target,c,'nested device precedes following top-level device');
+ h.setProject([h.track('Origin',a),h.track('Guitar',chain,c)]);
+ h.press(1);assert.equal(h.target,b,'first nested match precedes the following top-level device');
+ h.press(1);assert.equal(h.target,a,'later supported devices on the destination track are ignored');
  h.press(-1);assert.equal(h.target,b);h.press(-1);assert.equal(h.target,a);
- h.press(-1);assert.equal(h.target,c,'backwards wraps');
+ h.press(-1);assert.equal(h.target,b,'reverse track navigation still takes the first device');
  assert.equal(h.writes.length,0,'nested discovery does not write parameters');
 }
 
 {
  const h=fixture({clampBanks:true}),a=h.iroko(),b=h.iroko(),chain=h.unknown();
  chain.slots={FX:{name:'FX',devices:[...Array.from({length:11},()=>h.unknown()),b]}};
- h.setProject([h.track('Guitar',a,chain)]);h.press(1);assert.equal(h.target,b,'page through Chain children');
+ h.setProject([h.track('Origin',a),h.track('Guitar',chain)]);h.press(1);assert.equal(h.target,b,'page through Chain children');
  h.callbacks.midi(0xb0,65,127);h.callbacks.midi(0xb0,65,0);
  h.press(1);assert.equal(h.target,a);h.press(-1);assert.equal(h.target,b);assert.equal(h.pinned.get(),true,'nested target preserves lock');
  const lines=h.sysex.map(s=>Buffer.from(s,'hex')).filter(b=>b[6]===6&&b[7]===53).slice(-3).map(b=>b.subarray(9,-1).toString());
  assert.equal(lines[0],'Guitar','display uses owning track, not FX slot');
- const c=h.synth();chain.slots.FX.devices.push(c);h.changed();h.drain();h.press(1);assert.equal(h.target,c,'fresh discovery finds added children');
- chain.slots.FX.devices.splice(11,1);h.changed();h.drain();h.press(-1);assert.equal(h.target,a,'removed child is not selected from cache');
+ const c=h.synth();chain.slots.FX.devices.push(c);h.changed();h.drain();h.press(1);assert.equal(h.target,a);h.press(1);assert.equal(h.target,b,'later children do not replace the first supported child');
+ h.press(-1);assert.equal(h.target,a);chain.slots.FX.devices.splice(11,1);h.changed();h.drain();
+ h.press(1);assert.equal(h.target,c,'fresh scanning finds the new first supported child');
  assert.equal(h.writes.length,0);
 }
 {
  const h=fixture(),plugins=Array.from({length:18},()=>h.iroko()),chain=h.unknown();
  chain.slots={FX:{name:'FX',devices:plugins}};
  h.setProject([h.track('Nested only',chain)]);
- for(const p of plugins){h.press(1);assert.equal(h.target,p,'nested instances beyond retained cursor pool');}
- h.press(1);assert.equal(h.target,plugins[0]);h.press(-1);assert.equal(h.target,plugins[17]);
- // Manual nested selection must locate the origin's hierarchical position.
- h.select(0);h.drain();h.press(-1);assert.equal(h.target,plugins[17]);
+ for(const direction of [1,-1,1]){h.press(direction);assert.equal(h.target,plugins[0],'only the first nested instance is a navigation target');}
+ // Manually selecting the container still resolves to the track's first plugin.
+ h.select(0);h.drain();h.press(-1);assert.equal(h.target,plugins[0]);
 }
 {
  const h=fixture(),a=h.iroko(),b=h.iroko(),chain=h.unknown();
  chain.slots={FX:{name:'FX',devices:[b]}};
- h.setProject([h.track('A',a,chain),...Array.from({length:3},()=>h.track('Empty',h.unknown()))]);
+ h.setProject([h.track('A',a),h.track('B',chain),...Array.from({length:3},()=>h.track('Empty',h.unknown()))]);
  h.press(1,false);h.drain(()=>h.context.navigator.status().destination?.child===0);
  chain.slots.FX.devices[0]=h.iroko();h.changed();h.drain();
  assert.equal(h.target,a,'lookalike replacement cannot steal a captured identity');
@@ -231,11 +283,23 @@ console.log('PASS: supported-instance ordering, wraps, duplicates, generic origi
 console.log('PASS: Chain discovery, ordering, empty slots, paging, locks, track labels, edits and stale nested identity');
 
 {
+ const h=fixture(),origin=h.iroko(),nested=h.iroko(),chain=h.unknown(),synth=h.synth();
+ chain.slots={FX:{name:'FX',devices:[nested]}};
+ h.setProject([h.track('Origin',origin),h.track('Destination',chain,synth)]);
+ h.press(1,false);h.drain(()=>h.context.navigator.status().destination?.child===0);
+ h.project[1].devices.reverse();const state=JSON.stringify(h.project);h.changed();h.drain();
+ assert.equal(h.target,origin,'moving a captured Chain must not select a stale first-match target');
+ assert.equal(h.context.navigator.status().message,'Plugins changed');
+ assert.equal(h.selections.length,0);assert.equal(h.writes.length,0);
+ assert.equal(JSON.stringify(h.project),state,'rejecting the stale destination must not change project data');
+}
+
+{
  const h=fixture(),a=h.iroko(),b=h.iroko(),empty=h.unknown(),multi=h.unknown(),chain=h.unknown();
  empty.slots={FX:{name:'FX',devices:[]}};
  multi.slots={Pre:{name:'Pre',devices:[h.iroko()]},Post:{name:'Post',devices:[]}};
  chain.slots={FX:{name:'FX',devices:[b]}};
- h.setProject([h.track('Guitar',a,empty,multi,chain)]);h.press(1);
+ h.setProject([h.track('Origin',a),h.track('Guitar',empty,multi,chain)]);h.press(1);
  assert.equal(h.target,b,'empty Chain is skipped, ambiguous multi-slot containers excluded');
  assert.equal(h.writes.length,0);
 }

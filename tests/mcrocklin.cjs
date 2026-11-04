@@ -89,7 +89,7 @@ h.selectDevice('McRocklin Suite', missing);
 assert.equal(c.activeProfile, null, 'matching name requires a complete signature');
 h.selectDevice('McRocklin Suite Copy', params);
 assert.equal(c.activeProfile, null, 'profile names match exactly');
-// The shared cached navigator includes the new profile without plugin-specific changes.
+// Fresh track-first navigation includes this profile without plugin-specific changes.
 const a = h.plugin('McRocklin Suite', Object.values(params));
 const b = h.plugin('Iroko', Object.values(c.IROKO_PARAMETERS));
 const d = h.plugin('Pigments', Object.values(c.PIGMENTS_PARAMETERS));
@@ -98,6 +98,7 @@ function next() { cb.midi(0xb0, 102, 127); cb.midi(0xb0, 102, 0); h.drain(); }
 next(); assert.equal(h.target, b);
 next(); assert.equal(h.target, d);
 next(); assert.equal(h.target, a); assert.equal(c.activeProfile.id, 'mcrocklin');
-assert.equal(c.navigator.status().scans, 1);
-assert.equal(c.navigator.status().cacheHits, 2);
-console.log('PASS: McRocklin captured IDs, all amp/page bindings, dynamic feedback, native units, both button layers, pickup, isolation and cached navigation.');
+assert.equal(c.navigator.status().scans, 3);
+assert.equal(c.navigator.status().cacheHits, 0);
+assert.equal(c.navigator.status().lastResult.cancelled, undefined);
+console.log('PASS: McRocklin captured IDs, all amp/page bindings, dynamic feedback, native units, both button layers, pickup, isolation and track-first navigation.');

@@ -35,10 +35,16 @@ avoiding two scripts with the same identity.
 
 - **Select a device header in Bitwig's device chain** to follow it. A floating
   plugin window does not necessarily change Bitwig's selection.
-- **Track left/right:** previous/next plugin instance with a registered custom
-  profile, across the project. Unsupported devices are skipped and navigation
-  wraps. Each instance is a separate stop, including duplicates on one track.
-  If locked, the lock moves with the destination.
+- **Select a Chain header:** when unlocked, the controller automatically selects
+  its first supported child and activates that profile; no Track-button press is
+  needed. This searches only the selected single-slot Chain, not other devices
+  or tracks. Empty/unsupported Chains stay in generic mode. Host bypass is not
+  changed, and a locked controller keeps its existing target.
+- **Track left/right:** previous/next track containing a registered custom
+  profile, skipping unsupported tracks and wrapping at the ends. Each track has
+  one navigation target: its first supported plugin in device-chain order.
+  Later supported plugins on that track are ignored. If locked, the lock moves
+  with the destination.
 - **Page up/down:** change the active profile's pages, or Bitwig's Remote Controls
   pages in generic mode.
 - **Shift + encoder:** fine adjustment.
@@ -61,35 +67,36 @@ The Track buttons are lit when the project has tracks. A press immediately shows
 by the destination plugin and track. Navigation errors also appear as an overlay
 so a recent knob display cannot hide them.
 
-Track navigation follows Bitwig's flattened track order, then main-chain device
-order. Group tracks, children of collapsed groups, return tracks and master are
-included. Discovery also searches one level of single-slot containers, including plugins
-inside a **Chain** (for example, Killgate followed by Iroko). Renaming the Chain
-preset does not affect matching. Multi-slot devices, layers, drum pads, and containers nested inside
-another container are not traversed. Bypassed plugins still
-qualify when their name and parameter signature match. Generic Remote Controls
-alone do not qualify. With no match, the display shows **No supported plugins**;
-with one instance, navigation stays there. From an unsupported device it chooses
-the nearest match in the requested direction, wrapping at the ends.
+Track navigation follows Bitwig's flattened track order. Group tracks, children
+of collapsed groups, return tracks and master are included. Both directions
+search each destination track's devices from first to last. Discovery also
+searches one level of single-slot containers, including plugins inside a
+**Chain** (for example, Killgate followed by Iroko). A match inside an earlier
+Chain wins over a supported device later on the track. Renaming the Chain
+preset does not affect matching. Multi-slot devices, layers, drum pads, and
+containers inside another container are not traversed. Bypassed plugins still
+qualify when their name and parameter signature match; generic Remote Controls
+alone do not qualify.
 
-The first navigation discovers supported plugins using metadata-only paged banks
-(one track and eight devices per window) and caches their locations. Later presses
-reuse that catalog for top-level-only projects. Projects with single-slot containers are
-rescanned on each navigation press so changes inside a Chain are not hidden by
-stale cached paths; this can make navigation slower. The first 16 discovered instances retain pinned identity
-cursors, so repeat switches select them directly without moving the discovery
-bank. Additional instances use the validated destination-window fallback.
-Track-count changes,
-observed device-list changes, and invalid destinations invalidate or rebuild the
-cache. **Shift + Track left/right** forces a fresh scan, useful after adding or
-moving plugins on tracks outside the current metadata window. The cache lasts
-until the controller reloads; the first scan can take longer on a large project.
+The search stops as soon as the destination track's first supported plugin is
+found. It does not build a project-wide instance catalog or open later
+containers. Every press searches fresh, so added, removed or reordered plugins
+are observed without a cache reset; **Shift + Track left/right** performs the
+same fresh search. With no eligible track, the display shows **No supported
+plugins**. With only one eligible track, both directions return to its first
+supported plugin, without reselecting it if it is already the target.
 
-Rapid presses queue in order. The script captures an independent identity cursor
-for the destination, selects its track and exact device, and waits for cursor
-acknowledgment before restoring the lock. Manual selection changes cancel pending
-navigation. Destination and lock acknowledgment checks run after host update
-batches, without extra settling delays once those conditions are satisfied.
+Discovery uses metadata-only paged banks (one track and eight devices per
+window) and separate pinned cursors in `FIRST_DEVICE` mode. Only the controller
+and the user-selection guard follow UI device selection. A Chain's UI slot does
+not need to be selected. Entering an empty slot is a host no-op, so an empty
+container can add approximately three seconds while the script waits for a
+possible delayed response.
+
+Rapid presses queue in order. The script captures the destination's identity,
+selects its track and exact device, and waits for acknowledgment before
+restoring the lock. Manual selection changes cancel pending navigation.
+Destination and lock acknowledgment checks run after host update batches.
 
 Parameter writes and preset commands pause during handoff. Pickup, button state
 and cached feedback reset even between identical plugin instances. The permanent
@@ -185,7 +192,7 @@ the entry point; the shared engine does not need plugin-specific edits.
 
 - `lib/controller.js`: selection, profile lifecycle, bindings, pickup and feedback
 - `lib/hardware.js`: LCXL3 DAW MIDI/SysEx and cached RGB output
-- `lib/navigation.js`: paged instance discovery, identity validation and handoff
+- `lib/navigation.js`: first-supported-device track search, identity validation and handoff
 - `lib/generic.js`: Bitwig Remote Controls fallback
 - `lib/profile-registry.js`: registration, validation and matching
 - `profiles/iroko.js`: Iroko behavior and layout

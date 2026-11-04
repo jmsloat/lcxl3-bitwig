@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) {
-    const callbacks={}, writes=[], midi=[], sysex=[], presetMessages=[], tasks=[], selections=[], bankScrolls=[];
+function createHarness({pinDelay=0,privatePinDelay=0,clampBanks=false,handoffEqualityDelay=0,slotEntryDelay=0,storedCursorModes={}}={}) {
+    const callbacks={}, writes=[], midi=[], sysex=[], presetMessages=[], tasks=[], selections=[], bankScrolls=[],slotEntries=[],cursorMoves=[];
     let project=[], uiTrack=null, uiDevice=null, tick=0, pending=false;
     const sources=[], proxies=[];
     function observable(initial) {
@@ -59,8 +59,8 @@ function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) 
             position:()=>dynamic(()=>parent(resolve())?.devices.indexOf(resolve())??-1),
             getDeviceChain:()=>trackProxy(()=>parent(resolve())),
             slotNames:()=>({addValueObserver(fn){let last; sources.push(()=>{const names=Object.keys(resolve()?.slots||{}),key=JSON.stringify(names);if(key!==last){last=key;fn(names);}});fn(Object.keys(resolve()?.slots||{}));}}),
-            getCursorSlot:()=>trackProxy(()=>Object.values(resolve()?.slots||{})[0]||null),
-            selectFirstInSlot(){throw Error('Discovery must not depend on asynchronous slot cursor moves');},
+            getCursorSlot:()=>trackProxy(()=>resolve()?.slots?.[resolve()?.selectedSlot]||null),
+            createSiblingsDeviceBank:width=>trackProxy(()=>parent(resolve())).createDeviceBank(width),
             createEqualsValue:other=>deviceEquality(()=>!!resolve()&&resolve()===other.resolve()),
             addDirectParameterIdObserver(fn){idsListener=fn;if(isMain)callbacks.ids=fn;fn(resolve()?.ids||[]);},
             addDirectParameterNormalizedValueObserver(fn){valueListener=fn;if(isMain)callbacks.value=fn;},
@@ -81,21 +81,41 @@ function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) 
     function follow(){for(const c of cursors){if(c.follow)c.track=uiTrack;if(c.follow&&!c.pin.get())c.dev=uiDevice;}}
     let main;
     function createCursorTrack(id,name,sends,scenes,followSelection) {
-        const c={track:uiTrack,dev:uiDevice,follow:followSelection,pin:observable(false)};cursors.push(c);
+        const c={id,track:uiTrack,dev:uiDevice,follow:followSelection,pin:observable(false)};cursors.push(c);
         const t=trackProxy(()=>c.track);
         t.selectChannel=other=>{c.track=other.resolve();changed();};
-        t.createCursorDevice=()=>{
+        t.createCursorDevice=(deviceId,deviceName,sends,mode)=>{
+            // The API argument is a creation default, not a migration of saved state.
+            if(Object.hasOwn(storedCursorModes,deviceId))mode=storedCursorModes[deviceId];
+            else storedCursorModes[deviceId]=mode;
+            c.mode=mode;
             const d=deviceProxy(()=>locateDevice(c.dev)?c.dev:null,id==='lcxl3-iroko-track');
-            d.selectDevice=other=>{c.dev=other.resolve();c.track=owner(c.dev);changed();};
+            function move(target){
+                cursorMoves.push({id,mode,pinned:c.pin.get(),target});
+                c.dev=target;c.track=owner(target);
+                // Unpinned selection-following cursors share Bitwig's editor selection.
+                if(mode===0&&!c.pin.get()&&uiDevice!==target){uiDevice=target;uiTrack=owner(target);selections.push(target);follow();}
+                if(mode===1)c.pin.set(true);
+                changed();
+            }
+            d.selectDevice=other=>{const target=other.resolve();if(target)move(target);};
+            d.selectFirstInSlot=name=>{
+                slotEntries.push({parent:c.dev,name});
+                const child=c.dev?.slots?.[name]?.devices[0];
+                // Bitwig leaves the cursor on its parent when the slot is empty.
+                if(child)schedule(()=>move(child),slotEntryDelay);
+            };
             d.isPinned=()=>c.pin;
             const set=c.pin.set;c.pin.set=v=>{
-                const apply=()=>{set(v);if(!v&&c.follow){c.dev=uiDevice;changed();}};
-                if(pinDelay&&id==='lcxl3-iroko-track')schedule(apply,pinDelay);else apply();
+                // Bitwig silently ignores pin(true) when no target is assigned.
+                const apply=()=>{if(v&&!locateDevice(c.dev))return;set(v);if(!v&&c.follow){c.dev=uiDevice;changed();}};
+                const delay=id==='lcxl3-iroko-track'?pinDelay:privatePinDelay;
+                if(delay)schedule(apply,delay);else apply();
             };
             if(id==='lcxl3-iroko-track')main={c,t,d};return d;
         };return t;
     }
-    const context={loadAPI:()=>{},CursorDeviceFollowMode:{FOLLOW_SELECTION:0},host:{
+    const context={loadAPI:()=>{},CursorDeviceFollowMode:{FOLLOW_SELECTION:0,FIRST_DEVICE:1},host:{
         scheduleTask:schedule,sendDatagramPacket:()=>{},defineController:()=>{},defineMidiPorts:()=>{},addDeviceNameBasedDiscoveryPair:()=>{},
         getMidiOutPort:()=>({sendMidi:(...args)=>midi.push(args),sendSysex:s=>sysex.push(s)}),
         getMidiInPort:()=>({setMidiCallback:fn=>callbacks.midi=fn,createNoteInput:()=>({setShouldConsumeEvents:()=>{},sendRawMidiEvent:(...args)=>presetMessages.push(args)})}),
@@ -109,14 +129,14 @@ function createHarness({pinDelay=0,clampBanks=false,handoffEqualityDelay=0}={}) 
         while(tasks.length&&!until()) {if(--budget===0)throw Error('Task queue failed to settle');tasks.sort((a,b)=>a.at-b.at);const task=tasks.shift();tick=task.at;task.fn();context.flush();}
     }
     function select(t,d=0){uiTrack=project[t]||null;uiDevice=uiTrack?.devices[d]||null;follow();changed();}
-    function setProject(tracks,t=0,d=0){project=tracks;select(t,d);drain();}
+    function setProject(tracks,t=0,d=0,drainHost=true){project=tracks;select(t,d);if(drainHost)drain();}
     function plugin(name,ids,values={}){return{name,ids:Array.from(ids),values:{...values}};}
     function selectDevice(name,parameters={},values={}) {
         if(main.c.pin.get())return;
         const obj=plugin(name,Object.values(parameters),values);project=[{name:'Test Track',devices:name?[obj]:[]}];select(0);drain();context.flush();
         // Existing regression fixtures can inject captured host callbacks directly.
     }
-    return {context,callbacks,writes,midi,sysex,presetMessages,remoteState,remotePage,pinned:main.c.pin,tasks,selections,bankScrolls,
+    return {context,callbacks,writes,midi,sysex,presetMessages,remoteState,remotePage,pinned:main.c.pin,tasks,selections,bankScrolls,slotEntries,cursorMoves,
         present:{set:v=>callbacksExists(v)},selectDevice,select,setProject,plugin,drain,changed,get target(){return main.c.dev;},get project(){return project;},get time(){return tick;}};
     function callbacksExists(v){if(!v)selectDevice('',{});}
 }
