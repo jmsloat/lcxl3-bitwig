@@ -4,7 +4,8 @@ A Novation Launch Control XL 3 controller script that follows the selected Bitwi
 device, loads a preprogrammed profile when available, and falls back to Bitwig's
 Remote Controls for everything else. Written against Bitwig Studio 6.1.3 / API 18.
 
-The first custom profile is PolyChrome DSP Iroko. It preserves the guitar-effects
+Included custom profiles are PolyChrome DSP Iroko, Arturia Pigments, and
+PolyChrome DSP McRocklin Suite. Iroko preserves the guitar-effects
 layout, grouped colors, value brightness, button feedback, and fader pickup.
 
 ## Install
@@ -34,10 +35,16 @@ avoiding two scripts with the same identity.
 
 - **Select a device header in Bitwig's device chain** to follow it. A floating
   plugin window does not necessarily change Bitwig's selection.
-- **Track left/right:** previous/next plugin instance with a registered custom
-  profile, across the project. Unsupported devices are skipped and navigation
-  wraps. Each instance is a separate stop, including duplicates on one track.
-  If locked, the lock moves with the destination.
+- **Select a Chain header:** when unlocked, the controller automatically selects
+  its first supported child and activates that profile; no Track-button press is
+  needed. This searches only the selected single-slot Chain, not other devices
+  or tracks. Empty/unsupported Chains stay in generic mode. Host bypass is not
+  changed, and a locked controller keeps its existing target.
+- **Track left/right:** previous/next track containing a registered custom
+  profile, skipping unsupported tracks and wrapping at the ends. Each track has
+  one navigation target: its first supported plugin in device-chain order.
+  Later supported plugins on that track are ignored. If locked, the lock moves
+  with the destination.
 - **Page up/down:** change the active profile's pages, or Bitwig's Remote Controls
   pages in generic mode.
 - **Shift + encoder:** fine adjustment.
@@ -55,20 +62,48 @@ power-1.5 curve. Button LEDs use 15% when off and 100% when on. Settings are in
 [`lib/settings.js`](lib/settings.js); effect hues belong to the device profile.
 Faders use pickup to avoid jumps after device changes or external edits.
 
-Track navigation follows Bitwig's flattened track order, then main-chain device
-order. Group tracks, children of collapsed groups, return tracks and master are
-included; devices nested inside racks/layers are excluded. Bypassed plugins still
-qualify when their name and parameter signature match. Generic Remote Controls
-alone do not qualify. With no match, the display shows **No supported plugins**;
-with one instance, navigation stays there. From an unsupported device it chooses
-the nearest match in the requested direction, wrapping at the ends.
+The Track buttons are lit when the project has tracks. A press immediately shows
+`Finding next plugin` or `Finding previous plugin` while discovery runs, followed
+by the destination plugin and track. Navigation errors also appear as an overlay
+so a recent knob display cannot hide them.
 
-Discovery uses metadata-only paged banks (one track and eight devices per window),
-scanning all pages without a project-size limit. Rapid presses queue in order;
-large projects take longer to scan. The script revalidates the destination using
-an independent pinned cursor, selects its track and exact device, and confirms
-the controller cursor before restoring the lock. Manual selection changes cancel
-pending discovery. A removed or moved destination cancels the handoff.
+Selecting a track automatically chooses its first supported plugin, without a
+Track-button press, even if Bitwig initially selects a later supported device. For example, serial effects
+`Killgate → McRocklin Suite` activate McRocklin Suite. The search stays on that
+track; if nothing matches, generic controls remain available. A deliberate device
+selection on the same track is respected, and a locked controller stays pinned
+until unlocked. Selecting a Chain still resolves inside that selected Chain.
+
+Track navigation follows Bitwig's flattened track order. Group tracks, children
+of collapsed groups, return tracks and master are included. Both directions
+search each destination track's devices from first to last. Discovery also
+searches one level of single-slot containers, including plugins inside a
+**Chain** (for example, Killgate followed by Iroko). A match inside an earlier
+Chain wins over a supported device later on the track. Renaming the Chain
+preset does not affect matching. Multi-slot devices, layers, drum pads, and
+containers inside another container are not traversed. Bypassed plugins still
+qualify when their name and parameter signature match; generic Remote Controls
+alone do not qualify.
+
+The search stops as soon as the destination track's first supported plugin is
+found. It does not build a project-wide instance catalog or open later
+containers. Every press searches fresh, so added, removed or reordered plugins
+are observed without a cache reset; **Shift + Track left/right** performs the
+same fresh search. With no eligible track, the display shows **No supported
+plugins**. With only one eligible track, both directions return to its first
+supported plugin, without reselecting it if it is already the target.
+
+Discovery uses metadata-only paged banks (one track and eight devices per
+window) and separate pinned cursors in `FIRST_DEVICE` mode. Only the controller
+and the user-selection guard follow UI device selection. A Chain's UI slot does
+not need to be selected. Entering an empty slot is a host no-op, so an empty
+container can add approximately three seconds while the script waits for a
+possible delayed response.
+
+Rapid presses queue in order. The script captures the destination's identity,
+selects its track and exact device, and waits for acknowledgment before
+restoring the lock. Manual selection changes cancel pending navigation.
+Destination and lock acknowledgment checks run after host update batches.
 
 Parameter writes and preset commands pause during handoff. Pickup, button state
 and cached feedback reset even between identical plugin instances. The permanent
@@ -132,7 +167,32 @@ preset name. The current API does not expose Iroko's internal preset name or a
 navigation acknowledgment. Plugin routing, MIDI channel, and actual previous/next
 behavior require a live check in your project.
 
+## Pigments profile
+
+Pigments uses captured direct parameter IDs with four encoder pages: Performance,
+Envelopes, LFOs, and Mixer + FX. Faders control macros 1–4, engine volumes, aux
+return and master volume. Buttons control filters and engine/FX bypasses.
+See [docs/PIGMENTS.md](docs/PIGMENTS.md) for the full layout, LED semantics and
+compatibility limits.
+
+## McRocklin Suite profile
+
+McRocklin Suite uses five encoder pages: Amp + FX, Pre FX, Drives, Space, and
+EQ + Cab. Main amp controls follow the selected Acoustic/Clean/Edge/Gain amp.
+Faders control the four drive levels, delay/reverb mixes, gate and global output;
+buttons toggle the effects. Displays use native plugin values. See
+[docs/MCROCKLIN.md](docs/MCROCKLIN.md) for the complete layout and compatibility
+notes. Track navigation includes McRocklin alongside Iroko and Pigments.
+
 ## Add a profile
+
+### Helix Native
+
+Helix Native has a profile with five snapshot selectors, sixteen encoder roles,
+five effect toggles and pickup faders. It expects the documented automation-slot
+layout; arbitrary Native presets may assign different controls to those slots.
+Sound presets are maintained separately and are not included in this repository.
+See [Helix Native controls and live checks](docs/HELIX-NATIVE.md).
 
 See [`docs/PROFILES.md`](docs/PROFILES.md) for the profile contract, parameter
 capture workflow, and a minimal example. Add a profile and its `load()` call to
@@ -140,7 +200,7 @@ the entry point; the shared engine does not need plugin-specific edits.
 
 - `lib/controller.js`: selection, profile lifecycle, bindings, pickup and feedback
 - `lib/hardware.js`: LCXL3 DAW MIDI/SysEx and cached RGB output
-- `lib/navigation.js`: paged instance discovery, identity validation and handoff
+- `lib/navigation.js`: first-supported-device track search, identity validation and handoff
 - `lib/generic.js`: Bitwig Remote Controls fallback
 - `lib/profile-registry.js`: registration, validation and matching
 - `profiles/iroko.js`: Iroko behavior and layout

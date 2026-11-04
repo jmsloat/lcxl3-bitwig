@@ -24,7 +24,17 @@ Call `registerLCXL3Profile({...})` from a file loaded by the entry point:
 - `id`, `name`: stable internal ID and short screen title.
 - `matchNames`: exact, case-insensitive device names; avoid broad substrings.
 - `parameters`: `{ 'Readable Name': 'Bitwig parameter ID' }`.
+- `valueDisplay`: optional `"plugin"` to use only host-formatted labels (Hz, dB,
+  seconds, enum labels, etc.). This mode holds the last label while awaiting a
+  replacement and leaves the value blank before its first label. Numeric updates
+  still drive parameter writes, LEDs and pickup without inserting percentages.
+  `"normalized"` consistently shows 0–100% positions. By default the engine uses
+  current host-formatted values with a percentage fallback.
 - `requiredParameters`: signature names that must exist before activating.
+- `parameterSteps`: optional `{ 'Resolved Name': numberOfStates }` for selectors
+  with known, evenly normalized states. Each encoder detent advances one state;
+  Shift retains whole-state steps. This prevents a plugin rounding small
+  continuous increments back to the same state. Counts must be integers >= 2.
 - `pages`: named pages, each with exactly three arrays of eight binding names.
 - `faders`: exactly eight names. Use an empty string for an unassigned slot.
 - `buttons`: exactly sixteen names, top row followed by bottom row.
@@ -36,6 +46,12 @@ Call `registerLCXL3Profile({...})` from a file loaded by the entry point:
 - `layoutParameters`: names whose changes require resolving the layout again.
 - `buttonLabels`: optional friendly labels.
 - `buttonStates`: optional `{ 'Switch Name': ['Low State', 'High State'] }`.
+- `buttonActions`: optional button-index map of `{parameter, value, steps, label}`
+  for fixed-value selectors. Values are integer states within `steps`; actions
+  occupy the same button in both Shift layers and cannot overlap toggle/preset
+  bindings. Selected-state LEDs follow the host value, not the press/release edge.
+- `pickupResetParameters`: optional parameter names whose value changes rearm
+  fader pickup; discrete `parameterSteps` values are compared by state.
 - `alwaysOn`: optional names to keep enabled while the profile is active. This
   causes actual plugin writes and should be used deliberately.
 - `preset`: optional MIDI navigation configuration: `inputName` plus a `buttons`
@@ -84,4 +100,5 @@ are registered.
 Button parameter bindings use binary 0/1 toggles. Discrete controls with more
 than two states need an additional action type before they can be bound to a
 button; don't pretend an arbitrary enum is a binary toggle. Encoder bindings
-adjust normalized values, so continuous and stepped host parameters both work.
+adjust normalized values; use `parameterSteps` for known selectors that round
+small normalized increments away.

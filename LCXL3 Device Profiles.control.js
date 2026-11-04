@@ -5,6 +5,12 @@ load("lib/hardware.js");
 load("lib/generic.js");
 load("profiles/iroko-parameters.js");
 load("profiles/iroko.js");
+load("profiles/pigments-parameters.js");
+load("profiles/pigments.js");
+load("profiles/mcrocklin-parameters.js");
+load("profiles/mcrocklin.js");
+load("profiles/helix-native-parameters.js");
+load("profiles/helix-native.js");
 load("lib/navigation.js");
 load("lib/controller.js");
 
