@@ -1,6 +1,4 @@
 const assert = require('assert/strict');
-const fs = require('fs');
-const path = require('path');
 const {createHarness} = require('./harness.cjs');
 const h = createHarness();
 const c = h.context;
@@ -94,27 +92,13 @@ press(38);
 assert.equal(h.writes.length, 0);
 h.selectDevice('Unknown', ids);
 assert.equal(c.activeProfile, null);
-// Validate the generated assignment-only copy against its accepted source.
-const folder = path.join(__dirname, '..', 'presets', 'helix-native');
-const source = JSON.parse(fs.readFileSync(path.join(folder, '17 Orange Five.hlx')));
-const candidate = JSON.parse(fs.readFileSync(path.join(folder, '17 Orange Hardware.hlx')));
-const tone = candidate.data.tone;
-for (let i = 0; i < 16; i++) {
-    const binding = c.HELIX_BANK_KNOBS[i];
-    const assignment = tone.automation['@assignments'][i];
-    assert.equal(assignment['@param'], binding.target);
+// Validate the controller slot contract without depending on sound-preset assets.
+assert.equal(c.HELIX_BANK_KNOBS.length, 16);
+c.HELIX_BANK_KNOBS.forEach((binding, i) => {
     assert.equal(profile.parameters[binding.name], ids['Knob ' + String(i + 1).padStart(2, '0')]);
-}
-assert.deepEqual(tone.automation['@assignments'][0], source.data.tone.automation['@assignments'][0]);
-assert.deepEqual(tone.automation['@assignments'][16], source.data.tone.automation['@assignments'][16]);
-for (const assignment of tone.automation['@assignments'].filter(Boolean)) {
-    let value = tone;
-    for (const key of assignment['@param'].split('.')) value = value[key];
-    assert.ok(value >= assignment['@min'] && value <= assignment['@max']);
-}
-candidate.data.meta = source.data.meta;
-candidate.data.tone.automation = source.data.tone.automation;
-assert.deepEqual(candidate, source, 'hardware copy changes assignments only, not sound or snapshots');
+});
+assert.equal(c.HELIX_BANK_KNOBS[2].name, 'Mid / Cut');
+assert.equal(profile.parameters['Mid / Cut'], ids['Knob 03']);
 // Optional fixed-value actions must not hijack existing profile controls.
 function actionProfile(actions) {
     return {id: 'action-test', name: 'Test', matchNames: ['Action Test'], parameters: {Select: 'test/select'},
@@ -134,4 +118,4 @@ c.registerLCXL3Profile(synthetic);
 h.selectDevice('Action Test', synthetic.parameters);
 press(37);
 assert.deepEqual(h.writes.pop(), ['set', 'test/select', 2, 4], 'actions remain profile data, not Helix-specific routing');
-console.log('PASS: Helix slots, fixed snapshot actions/LEDs, feedback/pickup, mode guards, toggles, assignment-only preset and action validation.');
+console.log('PASS: Helix slots, fixed snapshot actions/LEDs, feedback/pickup, mode guards, toggles and action validation.');

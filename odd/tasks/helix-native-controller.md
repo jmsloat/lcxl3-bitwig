@@ -1,5 +1,6 @@
 # Helix Native controller support
 Objective: validate the LCXL3 workflow on the accepted Orange pilot before expanding the bank.
+Repository scope: controller code and regressions only. Preset artifacts mentioned below are historical local work, not repository deliverables.
 Branch: `codex/helix-native-controller`. Route: inline implementation, independent verification. Runner: `npm test`. Delivery: ask-on-risk; forecast approximately 380 authored lines, excluding generated preset data.
 
 ## Specs
@@ -32,3 +33,5 @@ do not block continuing the amp bank. Other pending physical checks remain pendi
 - L9: Installed locally with `python3 tools/install.py`. Backup: `/home/jsloat/Bitwig Studio/Controller Script Backups/LCXL3 Effects-20261027T202634Z-ea887d`. Installed controller/profile bytes match the working tree, retaining earlier installed navigation fixes. The new import file is `C:\17 Orange Hardware.hlx`; all original presets remain unchanged. Page https://chatgpt.com/space/page_58abf894e97c819190c488dc28ca02dd now contains the actual layout and acceptance checklist; readback confirmed it.
 - L10: Needs user acceptance: import the hardware-ready copy, select Helix Native's device header and reload the controller if needed. Check five selectors, five toggles, sixteen encoders, pickup and rapid snapshot→encoder feedback. Existing strong tremolo remains unchanged. Do not generate the remaining bank until this workflow is accepted. Engram task mirror remains pending.
 - L11 (2026-10-27): User: "i mean switching snapshots ( say from core to drive ) doesn't change the color of the drive pedal toggle button." User confirmed "no." when asked whether Bitwig Switch 02 changes too. Preset assignment and Core/Drive stored bypass states were checked; the controller depends on host switch feedback. Exact Native/Bitwig boundary remains unproven. User: "lets just file it as a known issue and move along." Record as deferred/non-blocking; no predicted-state workaround or sound changes. Documented in the Helix guide and bank Page. Other untested controls remain pending; no broader physical acceptance inferred.
+
+- L12 (2026-11-04): User: "well those preset files don't go in the bitwig lxcl repo i don't think. they shouldn't be tracked its just the controller pieces." Untrack local sound presets and preset-only checks/notes, retaining controller profiles, captured IDs, slot-contract tests and controller documentation. Local preset bytes are preserved; historical preset-generation entries above do not describe current repository contents.

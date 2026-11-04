@@ -6,3 +6,8 @@ controller-diagnostics.json
 selected-device-parameters.json
 *.log
 *.tmp
+
+# Sound presets and their local generation notes are not controller source.
+/presets/
+*.hlx
+/odd/tasks/helix-vox-pilot.md
