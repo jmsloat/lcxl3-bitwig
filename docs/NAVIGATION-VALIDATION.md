@@ -6,11 +6,15 @@ Chain. Track left/right changes tracks, not instances on the same track.
 
 ## Automated checks
 
-Run `npm test` for syntax, navigation and all profile/preset regressions. The
+Run `npm test` for syntax, navigation and all controller/profile regressions. The
 navigation harness covers:
 
 - Track order in both directions, unsupported-track skipping, wrap, one/no-match
   cases, generic and empty origins, and later supported plugins being ignored.
+- Selecting a track with serial `Killgate → McRocklin Suite` activates McRocklin
+  Suite automatically at startup, on track changes and after unlocking. Tests
+  cover track identity, first-match order (including later supported headers), one-level Chains, paged/delayed
+  metadata, quiet no-match/empty tracks, bypass and manual-device preservation.
 - Selecting a Chain automatically resolves its first supported child without
   MIDI input, including startup, renamed/paged Chains, identical names, delayed
   metadata, bypass preservation, quiet no-match behavior, manual cancellation,
@@ -87,3 +91,16 @@ plugins on the same track are ignored. Restore temporary diagnostics afterward.
 
 Earlier revisions' instance-catalog, retained-reference and cached-switch timing
 results do not apply to this track-first implementation.
+
+## Automatic serial-effect selection follow-up
+
+The automatic trigger previously required a selected single-slot container, so
+ordinary serial effects did not receive the same first-supported search as the
+Track buttons. Track-selection identity now triggers a track-local first-profile search, even
+when a later supported device was initially selected. Same-track device clicks are not track-change
+requests; locking, manual cancellation and explicit Track-button priority remain
+guarded. A recognizable plugin with delayed IDs remains observed after a paged
+no-match scan so it can retry without polling.
+
+The new serial-effect path has deterministic harness coverage; real-host
+Killgate → McRocklin Suite acceptance remains pending.

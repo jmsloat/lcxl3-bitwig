@@ -94,11 +94,12 @@ const a = h.plugin('McRocklin Suite', Object.values(params));
 const b = h.plugin('Iroko', Object.values(c.IROKO_PARAMETERS));
 const d = h.plugin('Pigments', Object.values(c.PIGMENTS_PARAMETERS));
 h.setProject([{name:'McRocklin',devices:[a]}, {name:'Iroko',devices:[b]}, {name:'Pigments',devices:[d]}]);
+const scansBeforeNavigation = c.navigator.status().scans;
 function next() { cb.midi(0xb0, 102, 127); cb.midi(0xb0, 102, 0); h.drain(); }
 next(); assert.equal(h.target, b);
 next(); assert.equal(h.target, d);
 next(); assert.equal(h.target, a); assert.equal(c.activeProfile.id, 'mcrocklin');
-assert.equal(c.navigator.status().scans, 3);
+assert.equal(c.navigator.status().scans - scansBeforeNavigation, 3);
 assert.equal(c.navigator.status().cacheHits, 0);
 assert.equal(c.navigator.status().lastResult.cancelled, undefined);
 console.log('PASS: McRocklin captured IDs, all amp/page bindings, dynamic feedback, native units, both button layers, pickup, isolation and track-first navigation.');

@@ -67,6 +67,13 @@ The Track buttons are lit when the project has tracks. A press immediately shows
 by the destination plugin and track. Navigation errors also appear as an overlay
 so a recent knob display cannot hide them.
 
+Selecting a track automatically chooses its first supported plugin, without a
+Track-button press, even if Bitwig initially selects a later supported device. For example, serial effects
+`Killgate → McRocklin Suite` activate McRocklin Suite. The search stays on that
+track; if nothing matches, generic controls remain available. A deliberate device
+selection on the same track is respected, and a locked controller stays pinned
+until unlocked. Selecting a Chain still resolves inside that selected Chain.
+
 Track navigation follows Bitwig's flattened track order. Group tracks, children
 of collapsed groups, return tracks and master are included. Both directions
 search each destination track's devices from first to last. Discovery also
