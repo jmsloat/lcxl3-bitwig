@@ -4,8 +4,9 @@ A Novation Launch Control XL 3 controller script that follows the selected Bitwi
 device, loads a preprogrammed profile when available, and falls back to Bitwig's
 Remote Controls for everything else. Written against Bitwig Studio 6.1.3 / API 18.
 
-Included custom profiles are PolyChrome DSP Iroko, Arturia Pigments, and
-PolyChrome DSP McRocklin Suite. Iroko preserves the guitar-effects
+Included custom profiles are PolyChrome DSP Iroko, Arturia Pigments,
+PolyChrome DSP McRocklin Suite, Helix Native, and the Arturia Augmented family.
+Iroko preserves the guitar-effects
 layout, grouped colors, value brightness, button feedback, and fader pickup.
 
 ## Install
@@ -174,6 +175,17 @@ Envelopes, LFOs, and Mixer + FX. Faders control macros 1–4, engine volumes, au
 return and master volume. Buttons control filters and engine/FX bypasses.
 See [docs/PIGMENTS.md](docs/PIGMENTS.md) for the full layout, LED semantics and
 compatibility limits.
+
+## Augmented profile
+
+One shared profile supports Augmented Grand Piano, Strings, Mallets, Voices,
+Yangtze, Woodwinds, and Brass. It has three encoder pages: Performance, Envelopes, and
+Sources + FX. Performance's top row maps Color, Time, Motion, FX A, FX B, Delay,
+and Reverb, with the eighth encoder unassigned. Pickup faders control the four
+source volumes, two layer volumes, Morph, and Master Volume. Buttons control source/filter bypass, effects,
+arpeggiator and chord mode. All seven share the same captured parameter IDs,
+layout, and page memory; the controller displays **AUGMENTED**.
+See [docs/AUGMENTED.md](docs/AUGMENTED.md) for the full layout and live checks.
 
 ## McRocklin Suite profile
 
